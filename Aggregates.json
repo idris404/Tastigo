@@ -1,0 +1,60 @@
+"commande-id" : "1234567890",
+"commande-date" : "2026-01-01",
+"commande-total" : 100,
+"commande-items" : [
+    {
+        "item-id" : "1234567890",
+        "item-name" : "Item 1",
+        "item-quantity" : 1,
+        "item-price" : 100
+    }
+]
+"Status commande" : "pending",
+"info livreur" : [
+    {
+        "Nom Livreur" : "John Doe",
+        "Telephone Livreur" : "1234567890",
+    }
+]
+"info restaurant" : [
+    {
+        "Nom Restaurant" : "Restaurant 1",
+        "Telephone Restaurant" : "1234567890",
+    }
+]
+
+// lirvaison
+
+"Nom Client" : "John Doe",
+"Telephone Client" : "1234567890",
+"Telephone Restaurant" : "1234567890",
+"Adresse Client" : "123 Main St, Anytown, USA",
+"Adresse Restaurant" : "123 Main St, Anytown, USA",
+"Nom restaurant" : "Restaurant 1",
+"Pourboire" : 
+"Status commande" : "pending",
+
+// Restaurant
+
+"Info client" : [
+    {
+        "Nom Client" : "John Doe",
+        "Telephone Client" : "1234567890",
+        "Adresse Client" : "123 Main St, Anytown, USA",
+    }
+]
+"Contenu commande" : [
+    {
+        "item-id" : "1234567890",
+        "item-name" : "Item 1",
+        "item-quantity" : 1,
+        "item-price" : 100
+    }
+]
+"Info Livreur" : [
+    {
+        "Nom Livreur" : "John Doe",
+        "Telephone Livreur" : "1234567890",
+    }
+]
+"Status commande" : "pending",
