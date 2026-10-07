@@ -7,7 +7,9 @@ Organisation du projet
 L'application est séparée en trois services :
 
 restaurant : gère la liste des restaurants (nom, adresse, horaires, ouvert ou fermé)
+
 catalogue : gère les plats proposés par chaque restaurant, avec leur prix et leur disponibilité
+
 livraison : gère les commandes et leur statut (en préparation, en route, livrée)
 
 Chaque service a sa propre API et ils communiquent entre eux en REST.
