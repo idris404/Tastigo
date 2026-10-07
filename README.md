@@ -10,4 +10,3 @@ L'application est séparée en trois services :
 - **commande** : gère les commandes passées par les clients (plats choisis, montant total, validation)
 - **livraison** : gère le suivi de la livraison une fois la commande validée (en préparation, en route, livrée)
 
-Chaque service a sa propre API et ils communiquent entre eux en REST.
