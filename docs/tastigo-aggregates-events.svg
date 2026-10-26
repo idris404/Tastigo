@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1280" viewBox="0 0 1800 1280" role="img" aria-labelledby="title desc">
+  <title id="title">Tastigo — Modèle de domaine et événements inter-services</title>
+  <desc id="desc">Schéma DDD détaillé des services Restaurant, Commande et Livraison, avec agrégats, entités, objets-valeur, commandes, événements, payloads et transitions d’état.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#1f2937"/></marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/></marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #172033; }
+      .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+      .page-title { font-size: 32px; font-weight: 700; }.page-sub { font-size: 15px; fill: #526075; }
+      .service { font-size: 21px; font-weight: 700; fill: #fff; }.service-sub { font-size: 11px; font-weight: 700; fill: #e8eef8; letter-spacing: 1.2px; }
+      .label { font-size: 11px; font-weight: 700; fill: #5f6b7c; letter-spacing: .9px; }.name { font-size: 17px; font-weight: 700; }
+      .type { font-size: 10px; font-weight: 700; fill: #fff; }.body { font-size: 12.5px; fill: #334155; }.small { font-size: 11px; fill: #536176; }.tiny { font-size: 10px; fill: #64748b; }
+      .cmd { font-size: 11.5px; fill: #334155; }.evt { font-size: 11.5px; font-weight: 700; fill: #1e40af; }.payload { font-size: 10px; fill: #475569; }.flow-title { font-size: 12px; font-weight: 700; }
+    </style>
+  </defs>
+  <rect width="1800" height="1280" fill="#f5f7fa"/>
+
+  <text x="60" y="54" class="page-title">Tastigo — modèle de domaine &amp; événements</text>
+  <text x="60" y="80" class="page-sub">Trois services métier et une projection de lecture • version de conception 1.0</text>
+  <g transform="translate(1208,32)">
+    <rect width="532" height="58" rx="5" fill="#fff" stroke="#cbd5e1"/>
+    <rect x="16" y="15" width="34" height="25" rx="3" fill="#111827"/><text x="33" y="32" text-anchor="middle" class="type">AR</text><text x="58" y="32" class="small">racine</text>
+    <rect x="123" y="15" width="28" height="25" rx="3" fill="#64748b"/><text x="137" y="32" text-anchor="middle" class="type">E</text><text x="159" y="32" class="small">entité</text>
+    <rect x="220" y="15" width="32" height="25" rx="3" fill="#64748b"/><text x="236" y="32" text-anchor="middle" class="type">VO</text><text x="260" y="32" class="small">objet-valeur</text>
+    <rect x="361" y="15" width="32" height="25" rx="3" fill="#2563eb"/><text x="377" y="32" text-anchor="middle" class="type">DE</text><text x="401" y="32" class="small">événement métier</text>
+  </g>
+
+  <!-- Restaurant -->
+  <g transform="translate(60,120)">
+    <rect width="540" height="790" rx="8" fill="#fff" stroke="#aeb8c6" stroke-width="1.5"/>
+    <path d="M8 0 H532 Q540 0 540 8 V72 H0 V8 Q0 0 8 0" fill="#1f5f4a"/>
+    <text x="24" y="32" class="service" fill="#ffffff">Service Restaurant</text><text x="24" y="55" class="service-sub" fill="#e8eef8">PROPRIÉTAIRE DU CATALOGUE</text>
+    <text x="22" y="102" class="label">AGRÉGAT RESTAURANT</text>
+    <rect x="22" y="116" width="496" height="238" rx="5" fill="#f8fafc" stroke="#64748b"/>
+    <rect x="38" y="132" width="34" height="22" rx="3" fill="#111827"/><text x="55" y="147" text-anchor="middle" class="type">AR</text><text x="82" y="149" class="name">Restaurant</text>
+    <text x="38" y="177" class="body mono">restaurantId: UUID</text><text x="38" y="198" class="body mono">nom: String</text><text x="38" y="219" class="body mono">statut:</text><text x="38" y="240" class="small mono">BROUILLON | PUBLIE | INDISPONIBLE</text>
+    <line x1="286" y1="132" x2="286" y2="334" stroke="#d7dde5"/>
+    <rect x="304" y="132" width="28" height="22" rx="3" fill="#64748b"/><text x="318" y="147" text-anchor="middle" class="type">E</text><text x="342" y="149" class="body" font-weight="700">Plat</text>
+    <text x="304" y="177" class="body mono">platId: UUID</text><text x="304" y="198" class="body mono">nom: String</text><text x="304" y="219" class="body mono">prix: Money</text><text x="304" y="240" class="body mono">disponible: Boolean</text>
+    <rect x="38" y="254" width="32" height="22" rx="3" fill="#64748b"/><text x="54" y="269" text-anchor="middle" class="type">VO</text><text x="80" y="270" class="body" font-weight="700">Adresse</text><text x="38" y="293" class="small">rue, ville, codePostal</text>
+    <rect x="304" y="268" width="32" height="22" rx="3" fill="#64748b"/><text x="320" y="283" text-anchor="middle" class="type">VO</text><text x="346" y="284" class="body" font-weight="700">Horaires</text><text x="304" y="307" class="small">jour, ouverture, fermeture</text>
+    <text x="38" y="331" class="tiny">1 Restaurant possède 0..n Plats et ses propres horaires.</text>
+    <text x="22" y="383" class="label">COMMANDES ACCEPTÉES</text>
+    <rect x="22" y="397" width="496" height="91" rx="5" fill="#fff" stroke="#d7dde5"/>
+    <text x="38" y="421" class="cmd mono">+ CreerRestaurant(nom, adresse)</text><text x="278" y="421" class="cmd mono">+ PublierRestaurant()</text>
+    <text x="38" y="445" class="cmd mono">+ AjouterPlat(nom, prix)</text><text x="278" y="445" class="cmd mono">+ ModifierPlat(platId, ...)</text>
+    <text x="38" y="469" class="cmd mono">+ ModifierHoraires(...)</text><text x="278" y="469" class="cmd mono">+ ChangerDisponibilite(...)</text>
+    <text x="22" y="517" class="label">ÉVÉNEMENTS PUBLIÉS</text>
+    <rect x="22" y="531" width="496" height="151" rx="5" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="38" y="547" width="32" height="21" rx="3" fill="#2563eb"/><text x="54" y="561" text-anchor="middle" class="type">DE</text><text x="80" y="562" class="evt mono">RestaurantPublie.v1</text><text x="80" y="578" class="payload mono">{ restaurantId, nom, adresse, horaires }</text>
+    <rect x="38" y="592" width="32" height="21" rx="3" fill="#2563eb"/><text x="54" y="606" text-anchor="middle" class="type">DE</text><text x="80" y="607" class="evt mono">MenuMisAJour.v1</text><text x="80" y="623" class="payload mono">{ restaurantId, platId, nom, prix, disponible }</text>
+    <rect x="38" y="637" width="32" height="21" rx="3" fill="#2563eb"/><text x="54" y="651" text-anchor="middle" class="type">DE</text><text x="80" y="652" class="evt mono">DisponibiliteRestaurantModifiee.v1</text><text x="80" y="668" class="payload mono">{ restaurantId, ancienStatut, nouveauStatut }</text>
+    <text x="22" y="711" class="label">INVARIANTS</text>
+    <rect x="22" y="725" width="496" height="45" rx="5" fill="#f8fafc" stroke="#d7dde5"/>
+    <text x="38" y="744" class="small">• prix d’un plat strictement positif</text><text x="38" y="760" class="small">• publication avec adresse et horaires valides</text>
+  </g>
+
+  <!-- Commande -->
+  <g transform="translate(630,120)">
+    <rect width="540" height="790" rx="8" fill="#fff" stroke="#aeb8c6" stroke-width="1.5"/>
+    <path d="M8 0 H532 Q540 0 540 8 V72 H0 V8 Q0 0 8 0" fill="#49358c"/>
+    <text x="24" y="32" class="service" fill="#ffffff">Service Commande</text><text x="24" y="55" class="service-sub" fill="#e8eef8">PROPRIÉTAIRE DU PANIER ET DU TOTAL</text>
+    <text x="22" y="102" class="label">AGRÉGAT COMMANDE</text>
+    <rect x="22" y="116" width="496" height="238" rx="5" fill="#f8fafc" stroke="#64748b"/>
+    <rect x="38" y="132" width="34" height="22" rx="3" fill="#111827"/><text x="55" y="147" text-anchor="middle" class="type">AR</text><text x="82" y="149" class="name">Commande</text>
+    <text x="38" y="177" class="body mono">commandeId: UUID</text><text x="38" y="198" class="body mono">clientId: UUID</text><text x="38" y="219" class="body mono">restaurantId: UUID</text><text x="38" y="240" class="body mono">statut: BROUILLON | VALIDEE | ANNULEE</text><text x="38" y="261" class="body mono">total: Money [calculé]</text>
+    <line x1="286" y1="132" x2="286" y2="334" stroke="#d7dde5"/>
+    <rect x="304" y="132" width="28" height="22" rx="3" fill="#64748b"/><text x="318" y="147" text-anchor="middle" class="type">E</text><text x="342" y="149" class="body" font-weight="700">LigneCommande</text>
+    <text x="304" y="177" class="body mono">ligneId: UUID</text><text x="304" y="198" class="body mono">platId: UUID</text><text x="304" y="219" class="body mono">nomPlat: String [copie]</text><text x="304" y="240" class="body mono">prixUnitaire: Money [copie]</text><text x="304" y="261" class="body mono">quantite: Integer</text>
+    <rect x="38" y="285" width="32" height="22" rx="3" fill="#64748b"/><text x="54" y="300" text-anchor="middle" class="type">VO</text><text x="80" y="301" class="body" font-weight="700">ContactClient</text><text x="38" y="324" class="small">nom, téléphone, adresseLivraison</text>
+    <text x="304" y="301" class="tiny">1 Commande contient 1..n lignes.</text><text x="304" y="321" class="tiny">Nom et prix figés à l’ajout.</text>
+    <text x="22" y="383" class="label">COMMANDES ACCEPTÉES</text>
+    <rect x="22" y="397" width="496" height="91" rx="5" fill="#fff" stroke="#d7dde5"/>
+    <text x="38" y="421" class="cmd mono">+ CreerCommande(client, restaurantId)</text><text x="38" y="445" class="cmd mono">+ AjouterLigne(platSnapshot, quantite)</text><text x="298" y="445" class="cmd mono">+ RetirerLigne(ligneId)</text><text x="38" y="469" class="cmd mono">+ ValiderCommande()</text><text x="298" y="469" class="cmd mono">+ AnnulerCommande(motif)</text>
+    <text x="22" y="517" class="label">ÉVÉNEMENTS PUBLIÉS</text>
+    <rect x="22" y="531" width="496" height="151" rx="5" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="38" y="547" width="32" height="21" rx="3" fill="#2563eb"/><text x="54" y="561" text-anchor="middle" class="type">DE</text><text x="80" y="562" class="evt mono">CommandeCreee.v1</text><text x="80" y="578" class="payload mono">{ commandeId, clientId, restaurantId, creeeLe }</text>
+    <rect x="38" y="592" width="32" height="21" rx="3" fill="#2563eb"/><text x="54" y="606" text-anchor="middle" class="type">DE</text><text x="80" y="607" class="evt mono">CommandeValidee.v1</text><text x="80" y="623" class="payload mono">{ commandeId, client, restaurant, lignes, total }</text>
+    <rect x="38" y="637" width="32" height="21" rx="3" fill="#2563eb"/><text x="54" y="651" text-anchor="middle" class="type">DE</text><text x="80" y="652" class="evt mono">CommandeAnnulee.v1</text><text x="80" y="668" class="payload mono">{ commandeId, motif, annuleeLe }</text>
+    <text x="22" y="711" class="label">INVARIANTS</text>
+    <rect x="22" y="725" width="496" height="45" rx="5" fill="#f8fafc" stroke="#d7dde5"/>
+    <text x="38" y="744" class="small">• total = Σ(prixUnitaire × quantité), quantité ≥ 1</text><text x="38" y="760" class="small">• validation avec ≥ 1 ligne et un restaurant unique</text>
+  </g>
+
+  <!-- Livraison -->
+  <g transform="translate(1200,120)">
+    <rect width="540" height="790" rx="8" fill="#fff" stroke="#aeb8c6" stroke-width="1.5"/>
+    <path d="M8 0 H532 Q540 0 540 8 V72 H0 V8 Q0 0 8 0" fill="#9a3e13"/>
+    <text x="24" y="32" class="service" fill="#ffffff">Service Livraison</text><text x="24" y="55" class="service-sub" fill="#e8eef8">PROPRIÉTAIRE DU SUIVI DE LIVRAISON</text>
+    <text x="22" y="102" class="label">AGRÉGAT LIVRAISON</text>
+    <rect x="22" y="116" width="496" height="238" rx="5" fill="#f8fafc" stroke="#64748b"/>
+    <rect x="38" y="132" width="34" height="22" rx="3" fill="#111827"/><text x="55" y="147" text-anchor="middle" class="type">AR</text><text x="82" y="149" class="name">Livraison</text>
+    <text x="38" y="177" class="body mono">livraisonId: UUID</text><text x="38" y="198" class="body mono">commandeId: UUID [unique]</text><text x="38" y="219" class="body mono">statut:</text><text x="38" y="240" class="small mono">EN_PREPARATION | EN_ROUTE | LIVREE</text><text x="38" y="261" class="body mono">pourboire: Money?</text>
+    <line x1="286" y1="132" x2="286" y2="334" stroke="#d7dde5"/>
+    <rect x="304" y="132" width="32" height="22" rx="3" fill="#64748b"/><text x="320" y="147" text-anchor="middle" class="type">VO</text><text x="346" y="149" class="body" font-weight="700">LivreurRef</text><text x="304" y="177" class="body mono">livreurId: UUID?</text><text x="304" y="198" class="body mono">nom: String?</text><text x="304" y="219" class="body mono">telephone: String?</text>
+    <rect x="38" y="268" width="32" height="22" rx="3" fill="#64748b"/><text x="54" y="283" text-anchor="middle" class="type">VO</text><text x="80" y="284" class="body" font-weight="700">PointCollecte</text><text x="38" y="307" class="small">restaurant, téléphone, adresse</text>
+    <rect x="304" y="268" width="32" height="22" rx="3" fill="#64748b"/><text x="320" y="283" text-anchor="middle" class="type">VO</text><text x="346" y="284" class="body" font-weight="700">Destination</text><text x="304" y="307" class="small">client, téléphone, adresse</text>
+    <text x="38" y="331" class="tiny">Créée uniquement à partir d’une commande validée.</text>
+    <text x="22" y="383" class="label">COMMANDES ACCEPTÉES</text>
+    <rect x="22" y="397" width="496" height="91" rx="5" fill="#fff" stroke="#d7dde5"/>
+    <text x="38" y="421" class="cmd mono">+ CreerDepuisCommande(event)</text><text x="298" y="421" class="cmd mono">+ AffecterLivreur(livreur)</text><text x="38" y="445" class="cmd mono">+ DemarrerLivraison()</text><text x="298" y="445" class="cmd mono">+ MarquerLivree()</text><text x="38" y="469" class="cmd mono">+ AjouterPourboire(montant)</text>
+    <text x="22" y="517" class="label">ÉVÉNEMENTS PUBLIÉS</text>
+    <rect x="22" y="531" width="496" height="151" rx="5" fill="#eff6ff" stroke="#93c5fd"/>
+    <rect x="38" y="547" width="32" height="21" rx="3" fill="#2563eb"/><text x="54" y="561" text-anchor="middle" class="type">DE</text><text x="80" y="562" class="evt mono">LivraisonCreee.v1</text><text x="80" y="578" class="payload mono">{ livraisonId, commandeId, collecte, destination }</text>
+    <rect x="38" y="592" width="32" height="21" rx="3" fill="#2563eb"/><text x="54" y="606" text-anchor="middle" class="type">DE</text><text x="80" y="607" class="evt mono">LivreurAffecte.v1</text><text x="80" y="623" class="payload mono">{ livraisonId, livreurId, affecteLe }</text>
+    <rect x="38" y="637" width="32" height="21" rx="3" fill="#2563eb"/><text x="54" y="651" text-anchor="middle" class="type">DE</text><text x="80" y="652" class="evt mono">StatutLivraisonModifie.v1</text><text x="80" y="668" class="payload mono">{ livraisonId, ancienStatut, nouveauStatut, date }</text>
+    <text x="22" y="711" class="label">INVARIANTS</text>
+    <rect x="22" y="725" width="496" height="45" rx="5" fill="#f8fafc" stroke="#d7dde5"/>
+    <text x="38" y="744" class="small">• une seule livraison par commandeId</text><text x="38" y="760" class="small">• EN_ROUTE exige un livreur affecté</text>
+  </g>
+
+  <!-- Flux -->
+  <g transform="translate(60,950)">
+    <text x="0" y="0" class="label">FLUX INTER-SERVICES PRINCIPAL</text>
+    <rect x="0" y="18" width="1680" height="204" rx="7" fill="#fff" stroke="#aeb8c6" stroke-width="1.5"/>
+    <rect x="24" y="45" width="250" height="48" rx="4" fill="#eef7f3" stroke="#84b7a4"/><text x="149" y="65" text-anchor="middle" class="flow-title">1. Lecture du menu</text><text x="149" y="82" text-anchor="middle" class="tiny mono">GET /restaurants/{id}/menu</text>
+    <line x1="274" y1="69" x2="402" y2="69" stroke="#1f2937" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#arrow)"/><text x="338" y="57" text-anchor="middle" class="tiny">API synchrone</text>
+    <rect x="422" y="45" width="300" height="48" rx="4" fill="#f3f0fc" stroke="#a99bd5"/><text x="572" y="65" text-anchor="middle" class="flow-title">2. Création + validation</text><text x="572" y="82" text-anchor="middle" class="tiny">prix et nom du plat copiés dans les lignes</text>
+    <line x1="722" y1="69" x2="850" y2="69" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrowBlue)"/><text x="786" y="55" text-anchor="middle" class="evt mono">CommandeValidee.v1</text>
+    <rect x="870" y="45" width="300" height="48" rx="4" fill="#fdf2ed" stroke="#d39a7e"/><text x="1020" y="65" text-anchor="middle" class="flow-title">3. Création idempotente</text><text x="1020" y="82" text-anchor="middle" class="tiny mono">clé = commandeId</text>
+    <line x1="1170" y1="69" x2="1298" y2="69" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrowBlue)"/><text x="1234" y="55" text-anchor="middle" class="evt mono">StatutLivraisonModifie.v1</text>
+    <rect x="1318" y="45" width="338" height="48" rx="4" fill="#f8fafc" stroke="#aeb8c6"/><text x="1487" y="65" text-anchor="middle" class="flow-title">4. Read model “Suivi client”</text><text x="1487" y="82" text-anchor="middle" class="tiny">préparation → en route → livrée</text>
+    <line x1="24" y1="121" x2="1656" y2="121" stroke="#d7dde5"/>
+    <text x="24" y="147" class="label">CONTRAT MINIMAL DE COMMANDE VALIDÉE</text>
+    <text x="24" y="171" class="body mono">eventId · eventType · eventVersion · occurredAt · commandeId · restaurant{id, nom, téléphone, adresse}</text>
+    <text x="24" y="193" class="body mono">client{id, nom, téléphone, adresse} · lignes[{platId, nom, quantité, prixUnitaire}] · total</text>
+    <rect x="1368" y="143" width="288" height="51" rx="4" fill="#fff7ed" stroke="#fdba74"/><text x="1382" y="162" class="small" font-weight="700">Traitement recommandé</text><text x="1382" y="180" class="tiny">outbox + consommation idempotente</text>
+  </g>
+
+  <g transform="translate(60,1194)">
+    <text x="0" y="18" class="label">TRANSITIONS</text><text x="110" y="18" class="body mono">Commande : BROUILLON → VALIDEE</text><text x="365" y="18" class="small">ou BROUILLON → ANNULEE</text><text x="650" y="18" class="body mono">Livraison : EN_PREPARATION → EN_ROUTE → LIVREE</text>
+    <text x="0" y="48" class="tiny">Sources : README.md, Aggregates.json et Events.json • contrats versionnés et consommation idempotente.</text>
+    <text x="1680" y="48" text-anchor="end" class="tiny">Tastigo • modèle de domaine v1.0</text>
+  </g>
+</svg>

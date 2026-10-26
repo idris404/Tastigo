@@ -1,0 +1,224 @@
+{
+  "projet": "Tastigo",
+  "version": 1,
+  "services": {
+    "restaurant": {
+      "role": "source de verite du catalogue",
+      "agregat": {
+        "type": "Restaurant",
+        "restaurantId": "rest_42",
+        "nom": "Le Bistrot Vert",
+        "telephone": "+33142000000",
+        "adresse": {
+          "ligne1": "12 rue des Lilas",
+          "codePostal": "75011",
+          "ville": "Paris"
+        },
+        "horaires": [
+          {
+            "jour": "LUNDI",
+            "ouverture": "11:30",
+            "fermeture": "22:30"
+          }
+        ],
+        "statut": "PUBLIE",
+        "plats": [
+          {
+            "platId": "plat_7",
+            "nom": "Bowl falafel",
+            "prix": {
+              "montant": 1290,
+              "devise": "EUR"
+            },
+            "disponible": true
+          }
+        ],
+        "version": 3
+      },
+      "invariants": [
+        "un plat appartient a un seul restaurant",
+        "le prix en centimes est strictement positif",
+        "un restaurant publie possede une adresse et au moins un horaire valide"
+      ]
+    },
+    "commande": {
+      "role": "source de verite des paniers et commandes",
+      "agregat": {
+        "type": "Commande",
+        "commandeId": "cmd_1001",
+        "client": {
+          "clientId": "cli_18",
+          "nom": "Camille Martin",
+          "telephone": "+33612000000",
+          "adresseLivraison": {
+            "ligne1": "8 avenue Parmentier",
+            "codePostal": "75011",
+            "ville": "Paris"
+          }
+        },
+        "restaurantId": "rest_42",
+        "lignes": [
+          {
+            "ligneId": "ligne_1",
+            "platId": "plat_7",
+            "nomPlat": "Bowl falafel",
+            "prixUnitaire": {
+              "montant": 1290,
+              "devise": "EUR"
+            },
+            "quantite": 2
+          }
+        ],
+        "total": {
+          "montant": 2580,
+          "devise": "EUR"
+        },
+        "statut": "VALIDEE",
+        "valideeLe": "2026-10-07T10:15:00Z",
+        "version": 2
+      },
+      "replicas": {
+        "catalogueRestaurants": {
+          "origine": "restaurant",
+          "raison": "consulter le menu et verifier prix et disponibilite sans lire la base Restaurant",
+          "donnees": [
+            {
+              "restaurantId": "rest_42",
+              "nom": "Le Bistrot Vert",
+              "statut": "PUBLIE",
+              "plats": [
+                {
+                  "platId": "plat_7",
+                  "nom": "Bowl falafel",
+                  "prix": {
+                    "montant": 1290,
+                    "devise": "EUR"
+                  },
+                  "disponible": true
+                }
+              ],
+              "sourceVersion": 3
+            }
+          ]
+        }
+      },
+      "invariants": [
+        "une commande contient au moins une ligne avant validation",
+        "toutes les lignes concernent le meme restaurant",
+        "quantite est superieure ou egale a 1",
+        "total est la somme de prixUnitaire multiplie par quantite",
+        "le nom et le prix du plat sont figes dans la ligne"
+      ]
+    },
+    "livraison": {
+      "role": "source de verite de l'acheminement",
+      "agregat": {
+        "type": "Livraison",
+        "livraisonId": "liv_501",
+        "commandeId": "cmd_1001",
+        "statut": "EN_PREPARATION",
+        "livreur": null,
+        "pourboire": null,
+        "collecte": {
+          "restaurantId": "rest_42",
+          "nom": "Le Bistrot Vert",
+          "telephone": "+33142000000",
+          "adresse": {
+            "ligne1": "12 rue des Lilas",
+            "codePostal": "75011",
+            "ville": "Paris"
+          }
+        },
+        "destination": {
+          "clientId": "cli_18",
+          "nom": "Camille Martin",
+          "telephone": "+33612000000",
+          "adresse": {
+            "ligne1": "8 avenue Parmentier",
+            "codePostal": "75011",
+            "ville": "Paris"
+          }
+        },
+        "creeLe": "2026-10-07T10:15:02Z",
+        "version": 1
+      },
+      "replicas": {
+        "commandeLivrable": {
+          "origine": "commande",
+          "raison": "organiser la livraison meme si le service Commande est indisponible",
+          "donnees": {
+            "commandeId": "cmd_1001",
+            "restaurantId": "rest_42",
+            "clientId": "cli_18",
+            "nombreArticles": 2,
+            "total": {
+              "montant": 2580,
+              "devise": "EUR"
+            },
+            "sourceVersion": 2
+          }
+        }
+      },
+      "invariants": [
+        "une commande possede au maximum une livraison",
+        "une livraison est creee seulement pour une commande validee",
+        "le passage a EN_ROUTE exige un livreur",
+        "les transitions autorisees sont EN_PREPARATION puis EN_ROUTE puis LIVREE"
+      ]
+    },
+    "suivi": {
+      "role": "projection de lecture pour le client",
+      "agregat": {
+        "type": "SuiviCommande",
+        "commandeId": "cmd_1001",
+        "livraisonId": "liv_501",
+        "restaurant": {
+          "nom": "Le Bistrot Vert"
+        },
+        "resume": {
+          "nombreArticles": 2,
+          "total": {
+            "montant": 2580,
+            "devise": "EUR"
+          }
+        },
+        "statutAffiche": "Votre commande est en preparation",
+        "derniereMiseAJour": "2026-10-07T10:15:02Z",
+        "chronologie": [
+          {
+            "statut": "COMMANDE_VALIDEE",
+            "date": "2026-10-07T10:15:00Z"
+          },
+          {
+            "statut": "EN_PREPARATION",
+            "date": "2026-10-07T10:15:02Z"
+          }
+        ]
+      },
+      "replicas": {
+        "resumeCommande": {
+          "origine": "commande",
+          "champs": [
+            "commandeId",
+            "restaurant.nom",
+            "nombreArticles",
+            "total"
+          ]
+        },
+        "etatLivraison": {
+          "origine": "livraison",
+          "champs": [
+            "livraisonId",
+            "statut",
+            "date"
+          ]
+        }
+      },
+      "invariants": [
+        "la projection est modifiee uniquement par des evenements",
+        "un evenement deja traite ne cree pas une seconde entree",
+        "la projection peut etre supprimee et reconstruite"
+      ]
+    }
+  }
+}

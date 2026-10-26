@@ -1,0 +1,204 @@
+{
+  "projet": "Tastigo",
+  "eventVersion": 1,
+  "convention": {
+    "champsObligatoires": [
+      "eventId",
+      "eventType",
+      "eventVersion",
+      "occurredAt",
+      "correlationId",
+      "emetteur",
+      "recepteur",
+      "aggregateId",
+      "aggregateVersion",
+      "modification"
+    ],
+    "idempotence": "le recepteur ignore un eventId deja traite",
+    "ordre": "le recepteur refuse une aggregateVersion inferieure ou egale a la version deja appliquee"
+  },
+  "evenements": [
+    {
+      "eventId": "evt_001",
+      "eventType": "RestaurantPublie",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-07T09:00:00Z",
+      "correlationId": "corr_rest_42",
+      "emetteur": "restaurant",
+      "recepteur": "commande",
+      "aggregateId": "rest_42",
+      "aggregateVersion": 1,
+      "operationReplica": "CREER",
+      "modification": {
+        "donneeAgregatModifiee": "catalogueRestaurants[rest_42]",
+        "ancienneValeur": null,
+        "nouvelleValeur": {
+          "restaurantId": "rest_42",
+          "nom": "Le Bistrot Vert",
+          "statut": "PUBLIE",
+          "plats": [
+            {
+              "platId": "plat_7",
+              "nom": "Bowl falafel",
+              "prix": {
+                "montant": 1250,
+                "devise": "EUR"
+              },
+              "disponible": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eventId": "evt_002",
+      "eventType": "MenuMisAJour",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-07T09:30:00Z",
+      "correlationId": "corr_rest_42",
+      "emetteur": "restaurant",
+      "recepteur": "commande",
+      "aggregateId": "rest_42",
+      "aggregateVersion": 3,
+      "operationReplica": "METTRE_A_JOUR",
+      "modification": {
+        "donneeAgregatModifiee": "catalogueRestaurants[rest_42].plats[plat_7].prix",
+        "ancienneValeur": {
+          "montant": 1250,
+          "devise": "EUR"
+        },
+        "nouvelleValeur": {
+          "montant": 1290,
+          "devise": "EUR"
+        }
+      }
+    },
+    {
+      "eventId": "evt_003",
+      "eventType": "CommandeValidee",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-07T10:15:00Z",
+      "correlationId": "corr_cmd_1001",
+      "emetteur": "commande",
+      "recepteur": "livraison",
+      "aggregateId": "cmd_1001",
+      "aggregateVersion": 2,
+      "operationReplica": "CREER",
+      "modification": {
+        "donneeAgregatModifiee": "commandeLivrable[cmd_1001]",
+        "ancienneValeur": null,
+        "nouvelleValeur": {
+          "commandeId": "cmd_1001",
+          "client": {
+            "clientId": "cli_18",
+            "nom": "Camille Martin",
+            "telephone": "+33612000000",
+            "adresseLivraison": {
+              "ligne1": "8 avenue Parmentier",
+              "codePostal": "75011",
+              "ville": "Paris"
+            }
+          },
+          "restaurant": {
+            "restaurantId": "rest_42",
+            "nom": "Le Bistrot Vert",
+            "telephone": "+33142000000",
+            "adresse": {
+              "ligne1": "12 rue des Lilas",
+              "codePostal": "75011",
+              "ville": "Paris"
+            }
+          },
+          "nombreArticles": 2,
+          "total": {
+            "montant": 2580,
+            "devise": "EUR"
+          }
+        }
+      }
+    },
+    {
+      "eventId": "evt_004",
+      "eventType": "AdresseLivraisonModifiee",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-07T10:16:00Z",
+      "correlationId": "corr_cmd_1001",
+      "emetteur": "commande",
+      "recepteur": "livraison",
+      "aggregateId": "cmd_1001",
+      "aggregateVersion": 3,
+      "operationReplica": "METTRE_A_JOUR",
+      "modification": {
+        "donneeAgregatModifiee": "commandeLivrable[cmd_1001].client.adresseLivraison.ligne1",
+        "ancienneValeur": "8 avenue Parmentier",
+        "nouvelleValeur": "10 avenue Parmentier"
+      }
+    },
+    {
+      "eventId": "evt_005",
+      "eventType": "CommandeValidee",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-07T10:15:00Z",
+      "correlationId": "corr_cmd_1001",
+      "emetteur": "commande",
+      "recepteur": "suivi",
+      "aggregateId": "cmd_1001",
+      "aggregateVersion": 2,
+      "operationReplica": "CREER",
+      "modification": {
+        "donneeAgregatModifiee": "suivis[cmd_1001]",
+        "ancienneValeur": null,
+        "nouvelleValeur": {
+          "commandeId": "cmd_1001",
+          "restaurant": {
+            "nom": "Le Bistrot Vert"
+          },
+          "nombreArticles": 2,
+          "total": {
+            "montant": 2580,
+            "devise": "EUR"
+          },
+          "statut": "COMMANDE_VALIDEE"
+        }
+      }
+    },
+    {
+      "eventId": "evt_006",
+      "eventType": "LivraisonCreee",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-07T10:15:02Z",
+      "correlationId": "corr_cmd_1001",
+      "emetteur": "livraison",
+      "recepteur": "suivi",
+      "aggregateId": "liv_501",
+      "aggregateVersion": 1,
+      "operationReplica": "METTRE_A_JOUR",
+      "modification": {
+        "donneeAgregatModifiee": "suivis[cmd_1001].livraison",
+        "ancienneValeur": null,
+        "nouvelleValeur": {
+          "livraisonId": "liv_501",
+          "statut": "EN_PREPARATION",
+          "date": "2026-10-07T10:15:02Z"
+        }
+      }
+    },
+    {
+      "eventId": "evt_007",
+      "eventType": "StatutLivraisonModifie",
+      "eventVersion": 1,
+      "occurredAt": "2026-10-07T10:40:00Z",
+      "correlationId": "corr_cmd_1001",
+      "emetteur": "livraison",
+      "recepteur": "suivi",
+      "aggregateId": "liv_501",
+      "aggregateVersion": 2,
+      "operationReplica": "METTRE_A_JOUR",
+      "modification": {
+        "donneeAgregatModifiee": "suivis[cmd_1001].statutLivraison",
+        "ancienneValeur": "EN_PREPARATION",
+        "nouvelleValeur": "EN_ROUTE"
+      }
+    }
+  ]
+}
