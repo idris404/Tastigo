@@ -39,6 +39,13 @@ flowchart LR
 
 Le détail des frontières et des responsabilités se trouve dans [la définition des services](docs/services.md).
 
+## Bases NoSQL
+
+- **MongoDB — service Restaurant** : un restaurant, son adresse, ses horaires et ses plats sont conservés dans un même document. Ce modèle permet de lire un catalogue complet en une seule requête et correspond à la structure imbriquée de l'agrégat `Restaurant`.
+- **Redis — services Commande, Livraison et Suivi** : les agrégats sont représentés par des `HASH`, `LIST`, `SET`, `ZSET` et `STREAM`. Redis convient aux lectures rapides par identifiant, aux index simples, aux changements de statut et à la projection de lecture.
+
+Chaque service reste propriétaire de ses données. La collection MongoDB `outbox` contient les événements Restaurant destinés au réplica de catalogue du service Commande.
+
 ## Agrégats et règles principales
 
 - **Restaurant** est la racine du catalogue. Un plat appartient à un seul restaurant et son prix est strictement positif.
@@ -46,7 +53,7 @@ Le détail des frontières et des responsabilités se trouve dans [la définitio
 - **Livraison** est unique pour une commande. Elle ne peut passer à `EN_ROUTE` que si un livreur lui est affecté.
 - **SuiviCommande** est une projection en lecture seule. Elle est reconstruisible à partir des événements.
 
-Les exemples JSON complets sont dans [`Aggregates.json`](Aggregates.json) et leur explication dans [la documentation des agrégats](docs/aggregats.md).
+Les exemples JSON complets sont dans [`Aggregates.json`](Aggregates.json). Les traitements demandés sont définis dans [`Commands.json`](Commands.json). Leur explication se trouve dans [la documentation des agrégats](docs/aggregats.md).
 
 ## Découplage par événements
 
@@ -82,7 +89,7 @@ Cette vue évite au front-end d'interroger plusieurs services et reste reconstru
 - **Traçabilité** : `correlationId` relie les événements d'un même parcours métier.
 - **Évolution** : le nom d'événement et `eventVersion` versionnent le contrat.
 
-Dans une implémentation réelle, le producteur utiliserait un *outbox pattern* et chaque consommateur conserverait les identifiants déjà traités.
+La démonstration met en œuvre ce principe : MongoDB conserve les événements Restaurant dans une collection `outbox`, le consommateur les applique au réplica Redis et chaque service garde les `eventId` déjà traités.
 
 ## Arborescence du livrable
 
@@ -90,8 +97,22 @@ Dans une implémentation réelle, le producteur utiliserait un *outbox pattern* 
 Tastigo/
 ├── README.md
 ├── Aggregates.json
+├── Commands.json
 ├── Events.json
+├── docker-compose.yml
+├── mongodb/
+│   ├── init/01_restaurants.js
+│   ├── 02_requetes.js
+│   └── run-queries.sh
+├── redis/
+│   ├── 02_evenements.redis
+│   └── run.sh
+├── scripts/
+│   ├── demo.sh
+│   ├── process-mongodb-outbox.sh
+│   └── validate.sh
 └── docs/
+    ├── rapport-tastigo.pdf
     ├── services.md
     ├── agregats.md
     ├── evenements.md
@@ -100,14 +121,37 @@ Tastigo/
     └── tastigo-aggregates-events.svg
 ```
 
-## Vérification locale
+## Exécution complète
 
-Les deux fichiers de contrat doivent être des JSON valides :
+Prérequis : Docker Desktop, `jq` et Python 3.
 
 ```bash
-python3 -m json.tool Aggregates.json >/dev/null
-python3 -m json.tool Events.json >/dev/null
+./scripts/demo.sh
 ```
+
+Ce scénario :
+
+1. démarre MongoDB et Redis ;
+2. remplit les bases ;
+3. consomme `RestaurantPublie` et `MenuMisAJour` depuis l'outbox MongoDB ;
+4. crée et met à jour le catalogue répliqué dans Commande ;
+5. propage `CommandeValidee`, `LivraisonCreee` et `StatutLivraisonModifie` ;
+6. construit la projection `SuiviCommande` ;
+7. affiche les réplicas et la projection obtenus.
+
+Pour exécuter uniquement les requêtes MongoDB :
+
+```bash
+./mongodb/run-queries.sh
+```
+
+Pour contrôler automatiquement les contrats et les données :
+
+```bash
+./scripts/validate.sh
+```
+
+Résultat attendu : `VALIDATION_OK services=4 commandes=8 evenements=7 bases=2`.
 
 ## État des étapes demandées
 
@@ -116,4 +160,7 @@ python3 -m json.tool Events.json >/dev/null
 - [x] Étape 3 — agrégats définis en JSON
 - [x] Étape 4 — services découplés, événements de création et de mise à jour des réplicas
 - [x] Étape 5 — projection vers le nouveau service Suivi
+- [x] Deux technologies NoSQL remplies et interrogeables : MongoDB et Redis
+- [x] Démonstration exécutable de l'échange d'événements et de la projection
+- [x] Mini rapport PDF
 - [x] Invitation GitHub envoyée à `charroux` avec accès en écriture (acceptation en attente)

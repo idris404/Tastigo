@@ -1,0 +1,53 @@
+# Tastigo - propagation Commande -> Livraison -> Suivi avec Redis Streams
+
+# SERVICE COMMANDE - DB 2
+SELECT 2
+MULTI
+HSET commande:cmd_1001 commandeId cmd_1001 clientId cli_18 restaurantId rest_42 statut VALIDEE totalMontant 2580 totalDevise EUR version 2 valideeLe 2026-10-07T10:15:00Z
+HSET commande:cmd_1001:client nom "Camille Martin" telephone +33612000000
+HSET commande:cmd_1001:adresse ligne1 "8 avenue Parmentier" codePostal 75011 ville Paris
+RPUSH commande:cmd_1001:lignes ligne_1
+HSET commande:cmd_1001:ligne:ligne_1 platId plat_7 nomPlat "Bowl falafel" prixUnitaireMontant 1290 prixUnitaireDevise EUR quantite 2
+SADD evenements:traites evt_restaurant_publie_42_v1 evt_menu_maj_42_v3
+XADD evenements:sortants * eventId evt_commande_validee_livraison eventType CommandeValidee recepteur livraison aggregateId cmd_1001 aggregateVersion 2
+XADD evenements:sortants * eventId evt_commande_validee_suivi eventType CommandeValidee recepteur suivi aggregateId cmd_1001 aggregateVersion 2
+EXEC
+
+# SERVICE LIVRAISON - DB 3 : création du réplica puis de la livraison
+SELECT 3
+MULTI
+HSET replica:commande:cmd_1001 commandeId cmd_1001 restaurantId rest_42 clientId cli_18 nombreArticles 2 totalMontant 2580 totalDevise EUR sourceVersion 2
+HSET replica:commande:cmd_1001:collecte nom "Le Bistrot Vert" telephone +33142000000 ligne1 "12 rue des Lilas" codePostal 75011 ville Paris
+HSET replica:commande:cmd_1001:destination nom "Camille Martin" telephone +33612000000 ligne1 "8 avenue Parmentier" codePostal 75011 ville Paris
+HSET livraison:liv_501 livraisonId liv_501 commandeId cmd_1001 statut EN_PREPARATION version 1 creeLe 2026-10-07T10:15:02Z
+HSET livraisons:par-commande cmd_1001 liv_501
+SADD evenements:traites evt_commande_validee_livraison
+XADD evenements:sortants * eventId evt_livraison_creee eventType LivraisonCreee recepteur suivi aggregateId liv_501 aggregateVersion 1
+EXEC
+
+# Mise à jour du réplica Livraison par AdresseLivraisonModifiee
+MULTI
+HSET replica:commande:cmd_1001:destination ligne1 "10 avenue Parmentier"
+HSET replica:commande:cmd_1001 sourceVersion 3
+SADD evenements:traites evt_adresse_modifiee
+EXEC
+
+# Affectation et changement de statut
+MULTI
+HSET livraison:liv_501:livreur livreurId livreur_12 nom Samir
+HSET livraison:liv_501 statut EN_ROUTE version 2
+SADD evenements:traites evt_statut_livraison
+XADD evenements:sortants * eventId evt_statut_livraison eventType StatutLivraisonModifie recepteur suivi aggregateId liv_501 aggregateVersion 2
+EXEC
+
+# SERVICE SUIVI - DB 4 : projection transformée
+SELECT 4
+MULTI
+HSET suivi:cmd_1001 commandeId cmd_1001 livraisonId liv_501 nomRestaurant "Le Bistrot Vert" nombreArticles 2 totalMontant 2580 totalDevise EUR statutTechnique EN_ROUTE statutAffiche "Votre commande est en route" derniereMiseAJour 2026-10-07T10:25:00Z
+RPUSH suivi:cmd_1001:chronologie "COMMANDE_VALIDEE|2026-10-07T10:15:00Z" "EN_PREPARATION|2026-10-07T10:15:02Z" "EN_ROUTE|2026-10-07T10:25:00Z"
+SADD evenements:traites evt_commande_validee_suivi evt_livraison_creee evt_statut_livraison
+EXEC
+
+ECHO "Projection Suivi obtenue"
+HGETALL suivi:cmd_1001
+LRANGE suivi:cmd_1001:chronologie 0 -1

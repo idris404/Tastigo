@@ -1,0 +1,75 @@
+{
+  "projet": "Tastigo",
+  "version": 1,
+  "commandes": [
+    {
+      "commandType": "PublierRestaurant",
+      "service": "restaurant",
+      "agregat": "Restaurant",
+      "identifiantAgregat": "rest_42",
+      "donnees": { "restaurantId": "rest_42" },
+      "regles": ["adresse obligatoire", "au moins un horaire", "au moins un plat"],
+      "evenementProduit": "RestaurantPublie"
+    },
+    {
+      "commandType": "ModifierPrixPlat",
+      "service": "restaurant",
+      "agregat": "Restaurant",
+      "identifiantAgregat": "rest_42",
+      "donnees": { "platId": "plat_7", "nouveauPrix": { "montant": 1290, "devise": "EUR" } },
+      "regles": ["prix strictement positif", "plat appartenant au restaurant"],
+      "evenementProduit": "MenuMisAJour"
+    },
+    {
+      "commandType": "CreerCommande",
+      "service": "commande",
+      "agregat": "Commande",
+      "identifiantAgregat": "cmd_1001",
+      "donnees": { "clientId": "cli_18", "restaurantId": "rest_42" },
+      "regles": ["restaurant present dans le replica local"]
+    },
+    {
+      "commandType": "AjouterLigneCommande",
+      "service": "commande",
+      "agregat": "Commande",
+      "identifiantAgregat": "cmd_1001",
+      "donnees": { "platId": "plat_7", "quantite": 2 },
+      "regles": ["plat disponible dans le replica", "quantite superieure ou egale a 1"]
+    },
+    {
+      "commandType": "ValiderCommande",
+      "service": "commande",
+      "agregat": "Commande",
+      "identifiantAgregat": "cmd_1001",
+      "donnees": {},
+      "regles": ["au moins une ligne", "total recalcule", "statut BROUILLON"],
+      "evenementsProduits": ["CommandeValidee vers livraison", "CommandeValidee vers suivi"]
+    },
+    {
+      "commandType": "ModifierAdresseLivraison",
+      "service": "commande",
+      "agregat": "Commande",
+      "identifiantAgregat": "cmd_1001",
+      "donnees": { "ligne1": "10 avenue Parmentier" },
+      "regles": ["livraison pas encore EN_ROUTE"],
+      "evenementProduit": "AdresseLivraisonModifiee"
+    },
+    {
+      "commandType": "AffecterLivreur",
+      "service": "livraison",
+      "agregat": "Livraison",
+      "identifiantAgregat": "liv_501",
+      "donnees": { "livreurId": "livreur_12", "nom": "Samir" },
+      "regles": ["livraison EN_PREPARATION"]
+    },
+    {
+      "commandType": "ModifierStatutLivraison",
+      "service": "livraison",
+      "agregat": "Livraison",
+      "identifiantAgregat": "liv_501",
+      "donnees": { "nouveauStatut": "EN_ROUTE" },
+      "regles": ["livreur affecte", "transition de statut autorisee"],
+      "evenementProduit": "StatutLivraisonModifie"
+    }
+  ]
+}
