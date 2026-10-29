@@ -39,6 +39,13 @@ flowchart LR
 
 Le détail des frontières et des responsabilités se trouve dans [la définition des services](docs/services.md).
 
+## Bases NoSQL
+
+- **MongoDB — service Restaurant** : un restaurant, son adresse, ses horaires et ses plats sont conservés dans un même document. Ce modèle permet de lire un catalogue complet en une seule requête et correspond à la structure imbriquée de l'agrégat `Restaurant`.
+- **Redis — services Commande et Livraison** : les agrégats sont représentés par des `HASH`, `LIST`, `SET` et `ZSET`. Redis convient aux lectures rapides par identifiant, aux index simples et aux changements de statut.
+
+Chaque service reste propriétaire de ses données. La collection MongoDB `outbox` contient les événements Restaurant destinés au réplica de catalogue du service Commande.
+
 ## Agrégats et règles principales
 
 - **Restaurant** est la racine du catalogue. Un plat appartient à un seul restaurant et son prix est strictement positif.
@@ -91,6 +98,13 @@ Tastigo/
 ├── README.md
 ├── Aggregates.json
 ├── Events.json
+├── docker-compose.yml
+├── mongodb/
+│   ├── init/01_restaurants.js
+│   ├── 02_requetes.js
+│   └── run-queries.sh
+├── redis/
+│   └── 01_agregats.redis
 └── docs/
     ├── services.md
     ├── agregats.md
@@ -107,6 +121,20 @@ Les deux fichiers de contrat doivent être des JSON valides :
 ```bash
 python3 -m json.tool Aggregates.json >/dev/null
 python3 -m json.tool Events.json >/dev/null
+```
+
+Pour démarrer MongoDB, remplir automatiquement la base `tastigo_restaurant`, puis exécuter les requêtes de démonstration :
+
+```bash
+docker compose up -d mongodb
+./mongodb/run-queries.sh
+```
+
+Les données MongoDB sont persistées dans le volume Docker `mongodb_data`. Pour forcer une nouvelle initialisation complète :
+
+```bash
+docker compose down -v
+docker compose up -d mongodb
 ```
 
 ## État des étapes demandées

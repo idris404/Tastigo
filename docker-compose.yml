@@ -1,0 +1,21 @@
+services:
+  mongodb:
+    image: mongo:8.0
+    container_name: tastigo-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: tastigo_restaurant
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongodb/init:/docker-entrypoint-initdb.d:ro
+      - ./mongodb:/workspace:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mongodb_data:
