@@ -116,29 +116,49 @@ db.createCollection("outbox", {
 
 db.outbox.createIndex({ eventId: 1 }, { unique: true });
 db.outbox.createIndex({ publie: 1, occurredAt: 1 });
-db.outbox.insertOne({
-  eventId: "evt_restaurant_publie_42_v3",
-  eventType: "RestaurantPublie",
-  eventVersion: NumberInt(1),
-  occurredAt: ISODate("2026-10-07T10:00:00Z"),
-  aggregateId: "rest_42",
-  aggregateVersion: NumberInt(3),
-  emetteur: "restaurant",
-  recepteur: "commande",
-  payload: {
-    restaurantId: "rest_42",
-    nom: "Le Bistrot Vert",
-    statut: "PUBLIE",
-    plats: [
-      {
-        platId: "plat_7",
-        nom: "Bowl falafel",
-        prix: { montant: NumberInt(1290), devise: "EUR" },
-        disponible: true
-      }
-    ]
+db.outbox.insertMany([
+  {
+    eventId: "evt_restaurant_publie_42_v1",
+    eventType: "RestaurantPublie",
+    eventVersion: NumberInt(1),
+    occurredAt: ISODate("2026-10-07T09:45:00Z"),
+    aggregateId: "rest_42",
+    aggregateVersion: NumberInt(1),
+    emetteur: "restaurant",
+    recepteur: "commande",
+    payload: {
+      restaurantId: "rest_42",
+      nom: "Le Bistrot Vert",
+      statut: "PUBLIE",
+      plats: [
+        {
+          platId: "plat_7",
+          nom: "Bowl falafel",
+          prix: { montant: NumberInt(1250), devise: "EUR" },
+          disponible: true
+        }
+      ]
+    },
+    publie: false
   },
-  publie: false
-});
+  {
+    eventId: "evt_menu_maj_42_v3",
+    eventType: "MenuMisAJour",
+    eventVersion: NumberInt(1),
+    occurredAt: ISODate("2026-10-07T10:00:00Z"),
+    aggregateId: "rest_42",
+    aggregateVersion: NumberInt(3),
+    emetteur: "restaurant",
+    recepteur: "commande",
+    payload: {
+      restaurantId: "rest_42",
+      platId: "plat_7",
+      champ: "prix",
+      ancienneValeur: { montant: NumberInt(1250), devise: "EUR" },
+      nouvelleValeur: { montant: NumberInt(1290), devise: "EUR" }
+    },
+    publie: false
+  }
+]);
 
-print("MongoDB initialise : 2 restaurants et 1 evenement dans l'outbox.");
+print("MongoDB initialise : 2 restaurants et 2 evenements dans l'outbox.");
