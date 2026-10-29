@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-SCRIPT_NAME="${1:-01_agregats.redis}"
+SCRIPT_NAME="${1:-02_evenements.redis}"
 SCRIPT_PATH="redis/$SCRIPT_NAME"
 
 if [ ! -f "$SCRIPT_PATH" ]; then

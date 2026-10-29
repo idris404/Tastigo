@@ -105,7 +105,6 @@ Tastigo/
 │   ├── 02_requetes.js
 │   └── run-queries.sh
 ├── redis/
-│   ├── 01_agregats.redis
 │   ├── 02_evenements.redis
 │   └── run.sh
 ├── scripts/
