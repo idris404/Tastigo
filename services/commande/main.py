@@ -18,6 +18,7 @@ from common.bus import (
     RejetMetier,
     RelaisOutboxRedis,
     connexion_service,
+    derniers_recus,
     etat_evenements,
     marquer_traite,
 )
@@ -587,3 +588,8 @@ def commandes_client(client_id: str):
 @app.get("/evenements")
 def evenements():
     return etat_evenements(r)
+
+
+@app.get("/evenements/recus")
+def evenements_recus(limite: int = 20):
+    return derniers_recus(SERVICE, min(limite, 200))

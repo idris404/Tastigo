@@ -38,6 +38,28 @@ class RejetMetier(Exception):
     """
 
 
+_bus_lecture: redis.Redis | None = None
+
+
+def derniers_recus(service: str, limite: int = 20) -> list[dict]:
+    """Derniers événements arrivés dans la boîte de réception du service (lecture seule)."""
+    global _bus_lecture
+    if _bus_lecture is None:
+        _bus_lecture = connexion_bus()
+    resultat = []
+    for message_id, champs in _bus_lecture.xrevrange(flux_vers(service), "+", "-", count=limite):
+        if "event" not in champs:
+            continue
+        evt = json.loads(champs["event"])
+        resultat.append(
+            {
+                "id": message_id,
+                **{k: evt[k] for k in ("eventId", "eventType", "emetteur", "recepteur", "aggregateId", "aggregateVersion", "occurredAt")},
+            }
+        )
+    return resultat
+
+
 def connexion_service() -> redis.Redis:
     """Connexion à la base logique Redis propre au service (REDIS_URL se termine par /<db>)."""
     return redis.Redis.from_url(os.environ["REDIS_URL"], decode_responses=True)

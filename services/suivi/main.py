@@ -20,6 +20,7 @@ from common.bus import (
     RejetMetier,
     connexion_bus,
     connexion_service,
+    derniers_recus,
     deja_traite,
     etat_evenements,
     marquer_traite,
@@ -200,3 +201,8 @@ def admin_reconstruire():
 @app.get("/evenements")
 def evenements():
     return etat_evenements(r)
+
+
+@app.get("/evenements/recus")
+def evenements_recus(limite: int = 20):
+    return derniers_recus(SERVICE, min(limite, 200))

@@ -133,11 +133,12 @@ def main():
             prix_source == prix_replica and replica["statut"] == source["statut"],
             f"{rid} : réplica identique à la source (version {source['version']}, statut {source['statut']})",
         )
-    try:
-        get("commande", "/catalogue/rest_77")
-        verifier(False, "rest_77 (BROUILLON) ne doit pas être répliqué")
-    except ErreurHttp as erreur:
-        verifier(erreur.code == 404, "rest_77 (BROUILLON) n'est pas répliqué : il n'a jamais été publié")
+    for rid in [r for r, s in sources.items() if s["statut"] == "BROUILLON"]:
+        try:
+            get("commande", f"/catalogue/{rid}")
+            verifier(False, f"{rid} (BROUILLON) ne doit pas être répliqué")
+        except ErreurHttp as erreur:
+            verifier(erreur.code == 404, f"{rid} (BROUILLON) n'est pas répliqué : il n'a jamais été publié")
 
     titre("2. Le service Commande travaille sur son réplica local")
     try:

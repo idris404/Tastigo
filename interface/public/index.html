@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tastigo · démonstration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;1,9..144,700;1,9..144,900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --papier: #efe8db;
+    --ticket: #fffdf7;
+    --encre: #1d1a16;
+    --doux: #6f665a;
+    --filet: #d8cdbb;
+    --resto: #2f7d4f;
+    --cmd: #2b62a8;
+    --liv: #6a45b8;
+    --suivi: #b8322f;
+    --bus: #c05621;
+    --surligne: #ffe55c;
+    --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+    --titre: "Fraunces", Georgia, "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    color: var(--encre);
+    font: 12.5px/1.5 var(--mono);
+    background-color: var(--papier);
+    background-image: radial-gradient(rgba(60, 40, 10, .06) 1px, transparent 1.2px);
+    background-size: 5px 5px;
+    min-height: 100vh;
+  }
+
+  /* ---------- en-tête ---------- */
+  header {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+    gap: 16px 32px; padding: 28px 28px 10px;
+  }
+  h1 {
+    margin: 0; font: italic 900 64px/0.9 var(--titre); letter-spacing: -0.02em;
+  }
+  h1 span { color: var(--bus); }
+  .sous-titre { margin: 8px 0 0; color: var(--doux); max-width: 60ch; }
+  #sante { display: flex; gap: 8px; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
+  #sante li {
+    border: 1.5px solid var(--encre); background: var(--ticket); padding: 3px 9px 3px 7px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: .08em; box-shadow: 2px 2px 0 var(--encre);
+  }
+  #sante li::before {
+    content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 7px; background: #aaa; vertical-align: 0;
+  }
+  #sante li.ok::before { background: var(--resto); box-shadow: 0 0 0 3px rgba(47, 125, 79, .18); }
+  #sante li.ko::before { background: var(--suivi); }
+
+  /* ---------- parcours guidé ---------- */
+  #guide {
+    display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; margin: 14px 28px 0; padding: 10px 0 0;
+    border-top: 2px solid var(--encre); counter-reset: etape;
+  }
+  #guide li { counter-increment: etape; color: var(--doux); padding: 2px 4px; }
+  #guide li::before { content: counter(etape) " · "; font-weight: 700; }
+  #guide li.fait { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+  #guide li.actuel { color: var(--encre); background: var(--surligne); font-weight: 700; }
+  #guide li.option { font-style: italic; }
+  #guide .astuce { counter-increment: none; margin-left: auto; font-style: italic; }
+  #guide .astuce::before { content: "→ "; }
+
+  /* ---------- tickets ---------- */
+  .rail {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px;
+    padding: 26px 28px 8px; align-items: start;
+  }
+  @media (max-width: 1280px) { .rail { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 720px) { .rail { grid-template-columns: minmax(0, 1fr); padding: 20px 16px; } header, #guide { padding-left: 16px; padding-right: 16px; margin-left: 0; margin-right: 0; } }
+
+  .ticket {
+    position: relative; background: var(--ticket); padding: 0 16px 14px;
+    border-top: 7px solid var(--c);
+    filter: drop-shadow(0 2px 2px rgba(40, 25, 5, .14)) drop-shadow(0 8px 14px rgba(40, 25, 5, .08));
+    animation: pose .55s cubic-bezier(.2, .9, .3, 1.2) both;
+  }
+  .ticket:nth-child(2) { animation-delay: .07s; }
+  .ticket:nth-child(3) { animation-delay: .14s; }
+  .ticket:nth-child(4) { animation-delay: .21s; }
+  @keyframes pose { from { opacity: 0; transform: translateY(-14px) rotate(-.6deg); } }
+  /* bord inférieur déchiré */
+  .ticket::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -7px; height: 7px;
+    background: conic-gradient(from -45deg at 50% 100%, var(--ticket) 90deg, transparent 0) 0 0 / 12px 100% repeat-x;
+  }
+  .tete { display: flex; align-items: baseline; gap: 10px; padding: 12px 0 8px; }
+  .tete .num { font-weight: 700; color: var(--c); font-size: 11px; }
+  .tete h2 { margin: 0; font: italic 700 25px/1 var(--titre); }
+  .tete .base {
+    margin-left: auto; font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--doux);
+    text-align: right;
+  }
+
+  .bloc { border-top: 1.5px dashed var(--filet); padding: 10px 0 11px; transition: background-color .2s; }
+  .bloc.flash { animation: surligne 1.6s ease-out; }
+  @keyframes surligne {
+    0%, 25% { background-color: var(--surligne); box-shadow: -6px 0 0 var(--surligne), 6px 0 0 var(--surligne); }
+    100% { background-color: transparent; box-shadow: none; }
+  }
+  .etiquette {
+    font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--doux); margin-bottom: 6px;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .etiquette .vient { color: var(--c); font-weight: 700; }
+  .vide { color: var(--doux); font-style: italic; }
+
+  .ligne { display: flex; align-items: baseline; gap: 6px; }
+  .ligne .pointilles { flex: 1; border-bottom: 1.5px dotted var(--filet); transform: translateY(-3px); min-width: 10px; }
+  .ligne .prix { font-weight: 600; white-space: nowrap; }
+  .ligne.barre .nom { text-decoration: line-through; color: var(--doux); }
+  .plats { display: grid; gap: 5px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .outils { display: inline-flex; gap: 3px; margin-left: 4px; }
+
+  .btn {
+    font: 600 11.5px var(--mono); color: var(--encre); background: var(--ticket); cursor: pointer;
+    border: 1.5px solid var(--encre); border-radius: 2px; padding: 4px 9px; box-shadow: 2px 2px 0 var(--encre);
+    transition: transform .06s, box-shadow .06s;
+  }
+  .btn:hover { background: #fff5d6; }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 0 0 0 var(--encre); }
+  .btn.plein { background: var(--c); border-color: var(--encre); color: #fff; }
+  .btn.plein:hover { filter: brightness(1.08); }
+  .btn.mini { padding: 0 5px; font-size: 11px; box-shadow: 1px 1px 0 var(--encre); }
+  .btn:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+
+  .onglets { display: flex; flex-wrap: wrap; gap: 5px; padding-bottom: 10px; }
+  .onglet {
+    font: 11px var(--mono); border: 1.5px solid var(--filet); background: transparent; padding: 3px 7px;
+    cursor: pointer; border-radius: 2px; color: var(--doux);
+  }
+  .onglet.actif { border-color: var(--encre); color: var(--encre); background: var(--surligne); font-weight: 700; }
+
+  .badge {
+    display: inline-block; border: 1.5px solid currentColor; border-radius: 2px; padding: 0 5px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+  }
+  .ok { color: var(--resto); }
+  .attente { color: var(--bus); }
+  .non { color: var(--suivi); }
+  .neutre { color: var(--doux); }
+  .gros { font: italic 700 22px/1.15 var(--titre); margin: 2px 0 6px; }
+  .total { border-top: 1.5px solid var(--encre); margin-top: 6px; padding-top: 4px; font-weight: 700; }
+  .petit { font-size: 11px; color: var(--doux); }
+  .chrono { list-style: none; margin: 0; padding: 0 0 0 12px; border-left: 2px solid var(--c); display: grid; gap: 4px; }
+  .chrono li { position: relative; }
+  .chrono li::before {
+    content: ""; position: absolute; left: -18px; top: 6px; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ticket); border: 2px solid var(--c);
+  }
+  .chrono li:last-child::before { background: var(--c); }
+
+  /* ---------- bus d'événements ---------- */
+  .bus {
+    margin: 30px 28px 40px; background: #1f1c18; color: #f3ecdf; border-radius: 3px; padding: 14px 18px 8px;
+    box-shadow: 0 10px 24px rgba(30, 20, 5, .22);
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 3px);
+  }
+  .bus h3 { margin: 0 0 8px; font: italic 700 20px var(--titre); display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .bus h3 small { font: 11px var(--mono); color: #b9ae9c; }
+  #evenements { display: grid; }
+  .evt {
+    display: grid; grid-template-columns: 105px 205px minmax(0, 1fr) 140px; gap: 12px; align-items: baseline;
+    padding: 5px 4px; border-bottom: 1px dashed #3d372f;
+  }
+  .evt.nouveau { animation: imprime .9s ease-out; }
+  @keyframes imprime {
+    0% { opacity: 0; transform: translateY(-8px); background: rgba(255, 229, 92, .35); }
+    40% { opacity: 1; transform: none; background: rgba(255, 229, 92, .35); }
+    100% { background: transparent; }
+  }
+  .evt .t { color: #b9ae9c; }
+  .evt .type { font-weight: 700; }
+  .evt .agg { color: #b9ae9c; text-align: right; }
+  .puce { padding: 0 5px; border-radius: 2px; font-weight: 700; color: #1f1c18; }
+  .p-restaurant { background: #7fcf9d; } .p-commande { background: #8db4ec; }
+  .p-livraison { background: #b9a2ef; } .p-suivi { background: #ef9a98; }
+  @media (max-width: 900px) {
+    .evt { grid-template-columns: 1fr; gap: 0; }
+    .evt .agg { text-align: left; }
+  }
+
+  #toast {
+    position: fixed; right: 20px; bottom: 20px; max-width: min(460px, calc(100vw - 40px));
+    background: var(--encre); color: #fff; padding: 10px 14px; border-radius: 2px;
+    box-shadow: 4px 4px 0 var(--bus); transform: translateY(140%); transition: transform .25s;
+    font-size: 12px; z-index: 10;
+  }
+  #toast.visible { transform: none; }
+  #toast.erreur { background: var(--suivi); box-shadow: 4px 4px 0 var(--encre); }
+  #toast b { display: block; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; opacity: .8; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Tastigo<span>.</span></h1>
+    <p class="sous-titre">Tableau de démonstration · quatre services autonomes, chacun avec sa base NoSQL ·
+      les réplicas sont mis à jour uniquement par événements. Ce qui change se surligne en jaune.</p>
+  </div>
+  <ul id="sante" aria-label="État des services"></ul>
+</header>
+
+<ol id="guide" aria-label="Parcours de démonstration"></ol>
+
+<main class="rail">
+  <article class="ticket" style="--c: var(--resto)">
+    <div class="tete"><span class="num">N°01</span><h2>Restaurant</h2><span class="base">MongoDB<br>catalogue source</span></div>
+    <div id="restaurant"></div>
+  </article>
+  <article class="ticket" style="--c: var(--cmd)">
+    <div class="tete"><span class="num">N°02</span><h2>Commande</h2><span class="base">Redis DB 2<br>panier · commande</span></div>
+    <div id="commande"></div>
+  </article>
+  <article class="ticket" style="--c: var(--liv)">
+    <div class="tete"><span class="num">N°03</span><h2>Livraison</h2><span class="base">Redis DB 3<br>acheminement</span></div>
+    <div id="livraison"></div>
+  </article>
+  <article class="ticket" style="--c: var(--suivi)">
+    <div class="tete"><span class="num">N°04</span><h2>Suivi</h2><span class="base">Redis DB 4<br>vue client</span></div>
+    <div id="suivi"></div>
+  </article>
+</main>
+
+<section class="bus" aria-live="polite">
+  <h3>Bus d'événements <small>Redis Streams · boîtes de réception evenements:vers:&lt;service&gt; · derniers reçus</small></h3>
+  <div id="evenements"></div>
+</section>
+
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+
+const CLIENT = {
+  clientId: "cli_18", nom: "Camille Martin", telephone: "+33612000000",
+  adresseLivraison: { ligne1: "8 avenue Parmentier", codePostal: "75011", ville: "Paris" },
+};
+const AUTRE_ADRESSE = { ligne1: "10 avenue Parmentier", codePostal: "75011", ville: "Paris" };
+const LIVREUR = { livreurId: "livreur_12", nom: "Samir" };
+const SERVICES = ["restaurant", "commande", "livraison", "suivi"];
+const LIBELLES_LIVRAISON = { EN_PREPARATION: "en préparation", EN_ROUTE: "en route", LIVREE: "livrée" };
+
+const etat = { cid: decodeURIComponent(location.hash.slice(1)) || null, rid: "rest_42", sansFlash: true, vus: new Set() };
+const precedents = new Map();
+
+// ------------------------------------------------------------------ outils
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const euros = (c) => (c / 100).toFixed(2).replace(".", ",") + " €";
+const heure = (iso) => (iso ? iso.slice(11, 23) : "");
+const badge = (texte, classe) => `<span class="badge ${classe}">${esc(texte)}</span>`;
+const bouton = (texte, action, donnees = {}, classe = "") =>
+  `<button class="btn ${classe}" data-action="${action}" ${Object.entries(donnees).map(([k, v]) => `data-${k}="${esc(v)}"`).join(" ")}>${texte}</button>`;
+const ligne = (nom, valeur, classe = "") =>
+  `<div class="ligne ${classe}"><span class="nom">${nom}</span><span class="pointilles"></span><span class="prix">${valeur}</span></div>`;
+const etiquette = (gauche, droite = "") => `<div class="etiquette"><span>${gauche}</span><span>${droite}</span></div>`;
+const adresse = (a) => (a ? `${esc(a.ligne1)}, ${esc(a.codePostal)} ${esc(a.ville)}` : "");
+const couleurStatut = (s) => ({ PUBLIE: "ok", VALIDEE: "ok", LIVREE: "ok", INDISPONIBLE: "non", BROUILLON: "neutre", EN_PREPARATION: "attente", EN_ROUTE: "attente" }[s] || "neutre");
+
+async function api(service, chemin, methode = "GET", corps) {
+  const reponse = await fetch(`/api/${service}${chemin}`, {
+    method: methode,
+    headers: { "Content-Type": "application/json" },
+    body: corps === undefined ? undefined : JSON.stringify(corps),
+  });
+  let donnees = null;
+  try { donnees = await reponse.json(); } catch { /* corps vide */ }
+  if (!reponse.ok) {
+    const d = donnees && donnees.detail;
+    const erreur = new Error(typeof d === "string" ? d : Array.isArray(d) ? d.map((x) => x.msg).join(", ") : `${reponse.status} ${reponse.statusText}`);
+    erreur.status = reponse.status;
+    throw erreur;
+  }
+  return donnees;
+}
+async function lire(service, chemin) {
+  try { return await api(service, chemin); }
+  catch (e) { if (e.status === 404) return null; throw e; }
+}
+
+let minuteurToast;
+function toast(message, erreur = false) {
+  const el = document.getElementById("toast");
+  el.innerHTML = `<b>${erreur ? "Refusé par une règle métier" : "Action effectuée"}</b>${esc(message)}`;
+  el.className = "visible" + (erreur ? " erreur" : "");
+  clearTimeout(minuteurToast);
+  minuteurToast = setTimeout(() => (el.className = ""), erreur ? 5500 : 3200);
+}
+
+// Peint un ticket bloc par bloc et surligne les blocs dont le contenu a changé.
+function peindre(conteneur, blocs) {
+  const html = blocs.map(([id, contenu]) => `<section class="bloc" id="${id}">${contenu}</section>`).join("");
+  const el = document.getElementById(conteneur);
+  if (precedents.get(conteneur) !== html) {
+    el.innerHTML = html;
+    precedents.set(conteneur, html);
+  }
+  for (const [id, contenu] of blocs) {
+    const avant = precedents.get(id);
+    if (avant !== undefined && avant !== contenu && !etat.sansFlash) {
+      const bloc = document.getElementById(id);
+      bloc.classList.remove("flash");
+      void bloc.offsetWidth;
+      bloc.classList.add("flash");
+    }
+    precedents.set(id, contenu);
+  }
+}
+
+// ------------------------------------------------------------------ rendu des tickets
+function rendreRestaurant(restaurants) {
+  const r = restaurants.find((x) => x.restaurantId === etat.rid) || restaurants[0];
+  const onglets = restaurants.map((x) =>
+    `<button class="onglet ${x.restaurantId === etat.rid ? "actif" : ""}" data-action="choisir" data-rid="${esc(x.restaurantId)}">${esc(x.nom)}</button>`
+  ).join("");
+  if (!r) return peindre("restaurant", [["r-vide", `<p class="vide">Aucun restaurant.</p>`]]);
+  let actionStatut = "";
+  if (r.statut === "BROUILLON") actionStatut = bouton("Publier", "publier", {}, "plein");
+  else if (r.statut === "PUBLIE") actionStatut = bouton("Fermer", "statut", { statut: "INDISPONIBLE" });
+  else actionStatut = bouton("Rouvrir", "statut", { statut: "PUBLIE" }, "plein");
+  const plats = r.plats.map((p) =>
+    `<div>${ligne(esc(p.nom), euros(p.prix.montant), p.disponible ? "" : "barre")}
+      <div class="petit">${esc(p.platId)} · ${p.disponible ? "disponible" : "indisponible"}
+        <span class="outils">${bouton("−0,50", "prix", { plat: p.platId, montant: Math.max(50, p.prix.montant - 50) }, "mini")}${bouton("+0,50", "prix", { plat: p.platId, montant: p.prix.montant + 50 }, "mini")}${bouton(p.disponible ? "épuisé" : "dispo", "dispo", { plat: p.platId, valeur: !p.disponible }, "mini")}</span>
+      </div></div>`
+  ).join("");
+  peindre("restaurant", [
+    ["r-onglets", `<div class="onglets">${onglets}</div>`],
+    ["r-agregat", etiquette("Agrégat · source de vérité", `v${r.version}`) +
+      `<div class="gros">${esc(r.nom)}</div>
+       <div>${badge(r.statut, couleurStatut(r.statut))} <span class="petit">${esc(r.adresse.ville)} · ${esc(r.restaurantId)}</span></div>
+       <div class="actions">${actionStatut}</div>`],
+    ["r-plats", etiquette("Plats (document imbriqué)") + `<div class="plats">${plats}</div>`],
+  ]);
+  return r;
+}
+
+function rendreCommande(source, replica, commande) {
+  let blocReplica;
+  if (!replica) {
+    blocReplica = etiquette(`Réplica <span class="vient">← Restaurant</span>`) +
+      `<p class="vide">${esc(source ? source.nom : etat.rid)} est absent du réplica : il n'a jamais été publié.</p>`;
+  } else {
+    const aJour = source && replica.sourceVersion === source.version;
+    const peutAjouter = commande && commande.statut === "BROUILLON" && commande.restaurantId === replica.restaurantId;
+    const plats = replica.plats.map((p) =>
+      `<div>${ligne(esc(p.nom), euros(p.prix.montant), p.disponible ? "" : "barre")}
+        ${peutAjouter && p.disponible && replica.statut === "PUBLIE" ? `<div class="actions" style="margin-top:3px">${bouton("+ ajouter", "ajouter", { plat: p.platId }, "mini")}</div>` : ""}</div>`
+    ).join("");
+    blocReplica = etiquette(`Réplica <span class="vient">← Restaurant</span>`,
+        aJour ? badge(`à jour · v${replica.sourceVersion}`, "ok") : badge(`v${replica.sourceVersion} → v${source ? source.version : "?"}`, "attente")) +
+      `<div>${badge(replica.statut, couleurStatut(replica.statut))} <span class="petit">${esc(replica.nom)}</span></div>
+       <div class="plats" style="margin-top:6px">${plats}</div>`;
+  }
+
+  let blocCommande;
+  if (!commande) {
+    blocCommande = etiquette("Agrégat Commande") +
+      `<p class="vide">Pas de commande en cours.</p>
+       <div class="actions">${bouton(`Créer une commande pour ${CLIENT.nom}`, "creer", {}, "plein")}</div>`;
+  } else {
+    const lignes = commande.lignes.map((l) =>
+      ligne(`${l.quantite} × ${esc(l.nomPlat)}${commande.statut === "BROUILLON" ? " " + bouton("×", "retirer", { ligne: l.ligneId }, "mini") : ""}`,
+        euros(l.prixUnitaire.montant * l.quantite))
+    ).join("") || `<p class="vide">Panier vide : ajoutez un plat depuis le réplica.</p>`;
+    const autreRestaurant = commande.restaurantId !== etat.rid
+      ? `<p class="petit">Commande passée chez ${esc(commande.restaurantId)}.</p>` : "";
+    const actions = [];
+    if (commande.statut === "BROUILLON") actions.push(bouton("Valider", "valider", {}, "plein"));
+    actions.push(bouton("Changer l'adresse", "adresse"));
+    actions.push(bouton("Nouvelle commande", "nouvelle"));
+    blocCommande = etiquette(`Agrégat Commande · ${esc(commande.commandeId)}`, `v${commande.version}`) +
+      `<div>${badge(commande.statut, couleurStatut(commande.statut))} <span class="petit">${esc(commande.client.nom)}</span></div>
+       ${autreRestaurant}
+       <div class="plats" style="margin-top:6px">${lignes}</div>
+       ${commande.lignes.length ? `<div class="total">${ligne("Total", euros(commande.total.montant))}</div>` : ""}
+       <p class="petit">Livrer à : ${adresse(commande.client.adresseLivraison)}</p>
+       <div class="actions">${actions.join("")}</div>`;
+  }
+
+  const etatLiv = commande && commande.replicaLivraison;
+  const blocEtat = etiquette(`Réplica <span class="vient">← Livraison</span>`, etatLiv ? `v${etatLiv.sourceVersion}` : "") +
+    (etatLiv ? `<div>${badge(etatLiv.statut, couleurStatut(etatLiv.statut))} <span class="petit">${esc(etatLiv.livraisonId)}</span></div>
+                <p class="petit">Sert à refuser un changement d'adresse quand le livreur est parti.</p>`
+             : `<p class="vide">Rien pour l'instant.</p>`);
+
+  peindre("commande", [["c-replica", blocReplica], ["c-commande", blocCommande], ["c-etat", blocEtat]]);
+}
+
+function rendreLivraison(commande, livraison, replica) {
+  let blocReplica;
+  if (!replica) {
+    blocReplica = etiquette(`Réplica <span class="vient">← Commande</span>`) +
+      `<p class="vide">En attente de l'événement CommandeValidee.</p>`;
+  } else {
+    const aJour = commande && replica.sourceVersion === commande.version;
+    blocReplica = etiquette(`Réplica <span class="vient">← Commande</span>`,
+        aJour ? badge(`à jour · v${replica.sourceVersion}`, "ok") : badge(`v${replica.sourceVersion}`, "neutre")) +
+      `${ligne("Collecte", esc(replica.collecte.nom))}
+       <p class="petit" style="margin:0 0 4px">${adresse(replica.collecte.adresse)}</p>
+       ${ligne("Destination", esc(replica.destination.nom))}
+       <p class="petit" style="margin:0 0 4px">${adresse(replica.destination.adresse)}</p>
+       ${ligne(`${replica.nombreArticles} article(s)`, euros(replica.total.montant))}`;
+  }
+
+  let blocLivraison;
+  if (!livraison) {
+    blocLivraison = etiquette("Agrégat Livraison") + `<p class="vide">Créée automatiquement à la validation de la commande.</p>`;
+  } else {
+    const actions = [];
+    if (livraison.statut === "EN_PREPARATION" && !livraison.livreur) actions.push(bouton(`Affecter ${LIVREUR.nom}`, "livreur", {}, "plein"));
+    if (livraison.statut === "EN_PREPARATION") actions.push(bouton("En route", "etape", { statut: "EN_ROUTE" }, livraison.livreur ? "plein" : ""));
+    if (livraison.statut === "EN_ROUTE") actions.push(bouton("Livrée", "etape", { statut: "LIVREE" }, "plein"));
+    const historique = livraison.historique.map((h) => `<li>${esc(h.statut)} <span class="petit">${heure(h.date)}</span></li>`).join("");
+    blocLivraison = etiquette(`Agrégat Livraison · ${esc(livraison.livraisonId)}`, `v${livraison.version}`) +
+      `<div class="gros">${esc(LIBELLES_LIVRAISON[livraison.statut] || livraison.statut)}</div>
+       ${ligne("Livreur", livraison.livreur ? esc(livraison.livreur.nom) : "—")}
+       <ul class="chrono" style="margin-top:8px">${historique}</ul>
+       <div class="actions">${actions.join("")}</div>`;
+  }
+  peindre("livraison", [["l-replica", blocReplica], ["l-livraison", blocLivraison]]);
+}
+
+function rendreSuivi(suivi) {
+  if (!suivi) {
+    return peindre("suivi", [["s-projection", etiquette(`Projection <span class="vient">← Commande + Livraison</span>`) +
+      `<p class="vide">Apparaît quand la commande est validée.</p>`]]);
+  }
+  const chrono = suivi.chronologie.map((e) => `<li>${esc(e.statut)} <span class="petit">${heure(e.date)}</span></li>`).join("");
+  peindre("suivi", [
+    ["s-projection", etiquette(`Projection <span class="vient">← Commande + Livraison</span>`) +
+      `<div class="petit">Où en est ma commande ?</div>
+       <div class="gros">${esc(suivi.statutAffiche)}</div>
+       ${ligne(esc(suivi.restaurant.nom || "—"), suivi.resume.total ? euros(suivi.resume.total.montant) : "—")}
+       <p class="petit">${suivi.resume.nombreArticles ?? "?"} article(s) · ${esc(suivi.livraisonId || "livraison en attente")}</p>`],
+    ["s-chrono", etiquette("Chronologie (ZSET triée par date)") + `<ul class="chrono">${chrono}</ul>
+       <div class="actions">${bouton("Reconstruire par rejeu", "reconstruire")}</div>`],
+  ]);
+}
+
+function rendreBus(listes) {
+  const tous = listes.flat().sort((a, b) => {
+    const [am, as] = a.id.split("-").map(Number);
+    const [bm, bs] = b.id.split("-").map(Number);
+    return bm - am || bs - as;
+  }).slice(0, 14);
+  const html = tous.map((e) => {
+    const cle = e.recepteur + e.id;
+    const nouveau = !etat.vus.has(cle) && !etat.sansFlash;
+    etat.vus.add(cle);
+    return `<div class="evt ${nouveau ? "nouveau" : ""}">
+      <span class="t">${heure(e.occurredAt)}</span>
+      <span><span class="puce p-${esc(e.emetteur)}">${esc(e.emetteur)}</span> → <span class="puce p-${esc(e.recepteur)}">${esc(e.recepteur)}</span></span>
+      <span class="type">${esc(e.eventType)}</span>
+      <span class="agg">${esc(e.aggregateId)} · v${esc(e.aggregateVersion)}</span></div>`;
+  }).join("") || `<p class="vide" style="color:#b9ae9c">Aucun événement pour l'instant.</p>`;
+  const el = document.getElementById("evenements");
+  if (precedents.get("bus") !== html.replace(/ nouveau/g, "")) {
+    el.innerHTML = html;
+    precedents.set("bus", html.replace(/ nouveau/g, ""));
+  }
+}
+
+function rendreGuide(commande, livraison) {
+  const etapes = ["Créer la commande", "Ajouter un plat", "Valider", "Changer l'adresse", "Affecter le livreur", "En route", "Livrée"];
+  let actuelle;
+  if (!commande) actuelle = 1;
+  else if (commande.statut === "BROUILLON") actuelle = commande.lignes.length ? 3 : 2;
+  else if (!livraison || (livraison.statut === "EN_PREPARATION" && !livraison.livreur)) actuelle = 5;
+  else if (livraison.statut === "EN_PREPARATION") actuelle = 6;
+  else if (livraison.statut === "EN_ROUTE") actuelle = 7;
+  else actuelle = 8;
+  const html = etapes.map((t, i) => {
+    const n = i + 1;
+    const classes = [n < actuelle ? "fait" : "", n === actuelle ? "actuel" : "", n === 4 ? "option" : ""].join(" ");
+    return `<li class="${classes}">${t}${n === 4 ? " (facultatif)" : ""}</li>`;
+  }).join("") + `<li class="astuce">${actuelle === 8 ? "Terminé ! " : ""}Changez un prix ou publiez Burger Lab : le réplica de Commande suit.</li>`;
+  const el = document.getElementById("guide");
+  if (el.innerHTML !== html) el.innerHTML = html;
+}
+
+// ------------------------------------------------------------------ boucle de rafraîchissement
+let enCours = false;
+async function rafraichir() {
+  if (enCours) return;
+  enCours = true;
+  try {
+    const restaurants = await api("restaurant", "/restaurants");
+    let commande = etat.cid ? await lire("commande", `/commandes/${etat.cid}`) : null;
+    if (etat.cid && !commande) { etat.cid = null; history.replaceState(null, "", " "); }
+    if (commande && !etat.ridFixe) { etat.rid = commande.restaurantId; etat.ridFixe = true; }
+    const source = rendreRestaurant(restaurants);
+    const [replica, livraison, replicaLiv, suivi, ...boites] = await Promise.all([
+      lire("commande", `/catalogue/${etat.rid}`),
+      commande ? lire("livraison", `/commandes/${commande.commandeId}/livraison`) : null,
+      commande ? lire("livraison", `/replicas/commandes/${commande.commandeId}`) : null,
+      commande ? lire("suivi", `/suivis/${commande.commandeId}`) : null,
+      ...["commande", "livraison", "suivi"].map((s) => api(s, "/evenements/recus?limite=14").catch(() => [])),
+    ]);
+    rendreCommande(source, replica, commande);
+    rendreLivraison(commande, livraison, replicaLiv);
+    rendreSuivi(suivi);
+    rendreBus(boites);
+    rendreGuide(commande, livraison);
+  } catch (e) {
+    console.error(e);
+  } finally {
+    etat.sansFlash = false;
+    enCours = false;
+  }
+}
+
+async function verifierSante() {
+  const etats = await Promise.all(SERVICES.map((s) => api(s, "/sante").then(() => true).catch(() => false)));
+  document.getElementById("sante").innerHTML =
+    SERVICES.map((s, i) => `<li class="${etats[i] ? "ok" : "ko"}">${s}</li>`).join("");
+}
+
+// ------------------------------------------------------------------ actions
+async function agir(appel, succes) {
+  try {
+    await appel();
+    toast(succes);
+  } catch (e) {
+    toast(e.message, true);
+  }
+  await rafraichir();
+}
+
+const ACTIONS = {
+  choisir: (d) => { etat.rid = d.rid; etat.ridFixe = true; etat.sansFlash = true; rafraichir(); },
+  publier: () => agir(() => api("restaurant", `/restaurants/${etat.rid}/publier`, "POST"),
+    "Restaurant publié : l'événement RestaurantPublie va créer le réplica dans Commande."),
+  statut: (d) => agir(() => api("restaurant", `/restaurants/${etat.rid}/statut`, "PUT", { statut: d.statut }),
+    `Statut ${d.statut} : StatutRestaurantModifie envoyé à Commande.`),
+  prix: (d) => agir(() => api("restaurant", `/restaurants/${etat.rid}/plats/${d.plat}/prix`, "PUT", { montant: Number(d.montant) }),
+    `Nouveau prix ${euros(Number(d.montant))} : MenuMisAJour envoyé à Commande. Les commandes déjà passées gardent leur prix.`),
+  dispo: (d) => agir(() => api("restaurant", `/restaurants/${etat.rid}/plats/${d.plat}/disponibilite`, "PUT", { disponible: d.valeur === "true" }),
+    "Disponibilité modifiée : MenuMisAJour envoyé à Commande."),
+  creer: () => agir(async () => {
+    const c = await api("commande", "/commandes", "POST", { client: CLIENT, restaurantId: etat.rid });
+    etat.cid = c.commandeId;
+    location.hash = c.commandeId;
+  }, "Commande créée (BROUILLON). Elle est vérifiée sur le réplica local du catalogue."),
+  ajouter: (d) => agir(() => api("commande", `/commandes/${etat.cid}/lignes`, "POST", { platId: d.plat, quantite: 1 }),
+    "Plat ajouté : nom et prix figés dans la ligne."),
+  retirer: (d) => agir(() => api("commande", `/commandes/${etat.cid}/lignes/${d.ligne}`, "DELETE"), "Ligne retirée."),
+  valider: () => agir(() => api("commande", `/commandes/${etat.cid}/valider`, "POST"),
+    "Commande validée : CommandeValidee envoyé à Livraison et à Suivi."),
+  adresse: () => agir(async () => {
+    const c = await api("commande", `/commandes/${etat.cid}`);
+    const actuelle = c.client.adresseLivraison.ligne1;
+    const nouvelle = actuelle === CLIENT.adresseLivraison.ligne1 ? AUTRE_ADRESSE : CLIENT.adresseLivraison;
+    await api("commande", `/commandes/${etat.cid}/adresse-livraison`, "PUT", nouvelle);
+  }, "Adresse modifiée : AdresseLivraisonModifiee envoyé à Livraison."),
+  nouvelle: () => { etat.cid = null; history.replaceState(null, "", " "); etat.sansFlash = true; rafraichir(); },
+  livreur: () => agir(async () => {
+    const l = await api("livraison", `/commandes/${etat.cid}/livraison`);
+    await api("livraison", `/livraisons/${l.livraisonId}/livreur`, "POST", LIVREUR);
+  }, `${LIVREUR.nom} est affecté à la livraison.`),
+  etape: (d) => agir(async () => {
+    const l = await api("livraison", `/commandes/${etat.cid}/livraison`);
+    await api("livraison", `/livraisons/${l.livraisonId}/statut`, "PUT", { statut: d.statut });
+  }, `Livraison ${d.statut} : StatutLivraisonModifie envoyé à Suivi et à Commande.`),
+  reconstruire: () => agir(async () => {
+    const r = await api("suivi", "/admin/reconstruire", "POST");
+    etat.reconstruit = r;
+  }, "Projection supprimée puis reconstruite en rejouant les événements du bus."),
+};
+
+document.addEventListener("click", (e) => {
+  const cible = e.target.closest("[data-action]");
+  if (cible && ACTIONS[cible.dataset.action]) ACTIONS[cible.dataset.action](cible.dataset);
+});
+
+(async function boucle() {
+  await rafraichir();
+  setTimeout(boucle, 800);
+})();
+verifierSante();
+setInterval(verifierSante, 5000);
+</script>
+</body>
+</html>

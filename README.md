@@ -30,6 +30,7 @@ Les **deux niveaux** du sujet sont livrés :
 | Livraison | 8003 | Redis DB 3 | `Livraison` | commande livrable (client, restaurant, total) |
 | Suivi | 8004 | Redis DB 4 | projection `SuiviCommande` | résumé de commande + état de livraison |
 | bus | 6380 | Redis Streams | — | une boîte de réception par service |
+| interface | 8000 | nginx (page web) | — | aucune : appelle uniquement les API des services |
 
 - **Restaurant → Commande** : `RestaurantPublie` crée le réplica du catalogue ; `MenuMisAJour` et `StatutRestaurantModifie` le mettent à jour.
 - **Commande → Livraison** : `CommandeValidee` crée le réplica de la commande et la livraison ; `AdresseLivraisonModifiee` le met à jour.
@@ -98,6 +99,16 @@ VALIDATION_OK verifications=23 commande=cmd_1001 livraison=liv_501 services=4 ba
 
 Pour voir les événements circuler en direct : `docker compose logs -f restaurant commande livraison suivi`.
 
+### Interface de démonstration
+
+Ouvrir **http://localhost:8000** une fois la pile démarrée.
+
+La page montre les quatre services côte à côte, comme des tickets de cuisine : l'agrégat de chaque service, ses réplicas (avec un badge « à jour » qui compare la `sourceVersion` à la version de la source) et, en bas, le bus d'événements en direct. Tout ce qui change après un événement est **surligné en jaune**.
+
+Un parcours guidé indique l'étape suivante : créer la commande, ajouter des plats depuis le réplica du catalogue, valider, changer l'adresse, affecter le livreur, passer en route puis livrée. Dans le ticket Restaurant, on peut modifier un prix, épuiser un plat, fermer un restaurant ou publier Burger Lab pour voir le réplica de Commande se mettre à jour. Les refus des règles métier (EN_ROUTE sans livreur, changement d'adresse après le départ…) s'affichent en rouge.
+
+La page ([`interface/public/index.html`](interface/public/index.html), HTML et JavaScript sans dépendance) est servie par nginx, qui relaie `/api/<service>/` vers l'API du service : elle n'accède à aucune base directement.
+
 ## Interroger les bases
 
 ```bash
@@ -133,7 +144,7 @@ Tastigo/
 ├── Aggregates.json          agrégats, stockage physique, réplicas et invariants
 ├── Commands.json            commandes (API) et règles métier
 ├── Events.json              contrats d'événements (exemples réels) et flux
-├── docker-compose.yml       MongoDB, Redis, bus Redis Streams, 4 services
+├── docker-compose.yml       MongoDB, Redis, bus Redis Streams, 4 services, interface
 ├── services/
 │   ├── Dockerfile, requirements.txt
 │   ├── common/              enveloppe d'événement, consommateur et relais d'outbox
@@ -141,6 +152,7 @@ Tastigo/
 │   ├── commande/            Redis DB 2
 │   ├── livraison/           Redis DB 3
 │   └── suivi/               Redis DB 4
+├── interface/               page de démonstration (public/index.html) + nginx.conf
 ├── niveau1/                 NIVEAU 1 sans service
 │   ├── run.sh               remplissage, relais, scénario, requêtes, vérifications
 │   ├── mongodb/remplir.js, outbox-vers-redis.js

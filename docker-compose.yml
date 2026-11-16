@@ -123,6 +123,25 @@ services:
       bus:
         condition: service_healthy
 
+  # Interface de démonstration ----------------------------------------------------------
+  interface:
+    image: nginx:1.27-alpine
+    container_name: tastigo-interface
+    ports:
+      - "8000:80"
+    volumes:
+      - ./interface/public:/usr/share/nginx/html:ro
+      - ./interface/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      restaurant:
+        condition: service_healthy
+      commande:
+        condition: service_healthy
+      livraison:
+        condition: service_healthy
+      suivi:
+        condition: service_healthy
+
 volumes:
   mongodb_data:
   redis_data:

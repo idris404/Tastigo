@@ -188,6 +188,8 @@ Résultats obtenus sur des bases vides :
 - la chronologie de suivi contient `COMMANDE_VALIDEE → EN_PREPARATION → EN_ROUTE → LIVREE` ; un événement republié sur le bus est ignoré ; la projection reconstruite par rejeu est identique ;
 - tous les événements observés respectent l'enveloppe de `Events.json`, l'outbox MongoDB est vide et aucun événement n'est rejeté. Le script se termine par `VALIDATION_OK verifications=23`.
 
+Une interface web (http://localhost:8000, page HTML servie par nginx qui relaie les appels vers les quatre API) présente les services côte à côte, surligne chaque réplica mis à jour par un événement et affiche le bus en direct ; elle sert de support à la démonstration.
+
 Un test de panne a également été réalisé : avec le service Livraison arrêté, une commande validée reste en attente sur le bus (`lag 1`) ; au redémarrage, Livraison rattrape l'événement et crée la livraison, puis Suivi est mis à jour.
 
 # Limites et perspectives
@@ -195,4 +197,4 @@ Un test de panne a également été réalisé : avec le service Livraison arrêt
 - Le relais de l'outbox MongoDB interroge la collection toutes les 0,5 s ; un *change stream* supprimerait cette latence.
 - Les trois services Redis partagent une instance (bases logiques séparées) : l'isolation repose sur la configuration. En production, une instance par service serait préférable.
 - Si une adresse est modifiée pendant que le statut `EN_ROUTE` est encore en transit, Livraison rejette l'événement et le trace, mais aucun événement de compensation n'informe Commande.
-- Un seul consommateur par service, pas d'authentification ni d'interface graphique, et des flux du bus non tronqués (ils servent de journal pour le rejeu).
+- Un seul consommateur par service, pas d'authentification, une interface de démonstration seulement, et des flux du bus non tronqués (ils servent de journal pour le rejeu).
