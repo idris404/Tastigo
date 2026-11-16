@@ -12,29 +12,96 @@
       "recepteur",
       "aggregateId",
       "aggregateVersion",
+      "operationReplica",
       "modification"
     ],
-    "idempotence": "le recepteur ignore un eventId deja traite",
-    "ordre": "le recepteur refuse une aggregateVersion inferieure ou egale a la version deja appliquee"
+    "modification": {
+      "donneeAgregatModifiee": "chemin lisible de la donnee modifiee dans le replica du recepteur",
+      "cible": "identifiants structures utilises par le recepteur pour retrouver la donnee",
+      "ancienneValeur": "valeur avant la modification (null pour une creation)",
+      "nouvelleValeur": "valeur apres la modification"
+    },
+    "transport": "Redis Streams : un flux par recepteur, evenements:vers:<service>, lu avec un groupe de consommateurs (XREADGROUP / XACK)",
+    "publication": "outbox transactionnelle : collection MongoDB outbox (Restaurant) ou STREAM Redis outbox (Commande, Livraison), relayee vers le bus",
+    "livraison": "au moins une fois",
+    "idempotence": "le recepteur ignore un eventId deja present dans son SET evenements:traites",
+    "ordre": "le recepteur ignore une aggregateVersion inferieure ou egale a la sourceVersion deja appliquee",
+    "rejet": "un evenement refuse par une regle metier est acquitte et trace dans la LIST evenements:rejetes"
   },
+  "flux": [
+    {
+      "emetteur": "restaurant",
+      "recepteur": "commande",
+      "replica": "catalogueRestaurants",
+      "creation": "RestaurantPublie",
+      "miseAJour": [
+        "MenuMisAJour",
+        "StatutRestaurantModifie"
+      ]
+    },
+    {
+      "emetteur": "commande",
+      "recepteur": "livraison",
+      "replica": "commandeLivrable",
+      "creation": "CommandeValidee",
+      "miseAJour": [
+        "AdresseLivraisonModifiee"
+      ]
+    },
+    {
+      "emetteur": "commande",
+      "recepteur": "suivi",
+      "replica": "suivis (projection)",
+      "creation": "CommandeValidee",
+      "miseAJour": []
+    },
+    {
+      "emetteur": "livraison",
+      "recepteur": "suivi",
+      "replica": "suivis (projection)",
+      "creation": null,
+      "miseAJour": [
+        "LivraisonCreee",
+        "StatutLivraisonModifie"
+      ]
+    },
+    {
+      "emetteur": "livraison",
+      "recepteur": "commande",
+      "replica": "etatLivraison",
+      "creation": "LivraisonCreee",
+      "miseAJour": [
+        "StatutLivraisonModifie"
+      ]
+    }
+  ],
   "evenements": [
     {
-      "eventId": "evt_001",
+      "eventId": "evt_ded987e8ada840a88c21",
       "eventType": "RestaurantPublie",
       "eventVersion": 1,
-      "occurredAt": "2026-10-07T09:00:00Z",
+      "occurredAt": "2026-11-16T14:57:54.883Z",
       "correlationId": "corr_rest_42",
       "emetteur": "restaurant",
       "recepteur": "commande",
       "aggregateId": "rest_42",
-      "aggregateVersion": 1,
+      "aggregateVersion": 2,
       "operationReplica": "CREER",
       "modification": {
         "donneeAgregatModifiee": "catalogueRestaurants[rest_42]",
+        "cible": {
+          "restaurantId": "rest_42"
+        },
         "ancienneValeur": null,
         "nouvelleValeur": {
           "restaurantId": "rest_42",
           "nom": "Le Bistrot Vert",
+          "telephone": "+33142000000",
+          "adresse": {
+            "ligne1": "12 rue des Lilas",
+            "codePostal": "75011",
+            "ville": "Paris"
+          },
           "statut": "PUBLIE",
           "plats": [
             {
@@ -45,16 +112,34 @@
                 "devise": "EUR"
               },
               "disponible": true
+            },
+            {
+              "platId": "plat_8",
+              "nom": "Salade grecque",
+              "prix": {
+                "montant": 1090,
+                "devise": "EUR"
+              },
+              "disponible": true
+            },
+            {
+              "platId": "plat_9",
+              "nom": "Houmous maison",
+              "prix": {
+                "montant": 650,
+                "devise": "EUR"
+              },
+              "disponible": true
             }
           ]
         }
       }
     },
     {
-      "eventId": "evt_002",
+      "eventId": "evt_f9877b64aa5942e98e08",
       "eventType": "MenuMisAJour",
       "eventVersion": 1,
-      "occurredAt": "2026-10-07T09:30:00Z",
+      "occurredAt": "2026-11-16T14:57:54.889Z",
       "correlationId": "corr_rest_42",
       "emetteur": "restaurant",
       "recepteur": "commande",
@@ -63,6 +148,11 @@
       "operationReplica": "METTRE_A_JOUR",
       "modification": {
         "donneeAgregatModifiee": "catalogueRestaurants[rest_42].plats[plat_7].prix",
+        "cible": {
+          "restaurantId": "rest_42",
+          "platId": "plat_7",
+          "champ": "prix"
+        },
         "ancienneValeur": {
           "montant": 1250,
           "devise": "EUR"
@@ -74,18 +164,41 @@
       }
     },
     {
-      "eventId": "evt_003",
+      "eventId": "evt_52bcc94d65704bcaa91f",
+      "eventType": "StatutRestaurantModifie",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-16T14:57:54.923Z",
+      "correlationId": "corr_rest_63",
+      "emetteur": "restaurant",
+      "recepteur": "commande",
+      "aggregateId": "rest_63",
+      "aggregateVersion": 3,
+      "operationReplica": "METTRE_A_JOUR",
+      "modification": {
+        "donneeAgregatModifiee": "catalogueRestaurants[rest_63].statut",
+        "cible": {
+          "restaurantId": "rest_63"
+        },
+        "ancienneValeur": "PUBLIE",
+        "nouvelleValeur": "INDISPONIBLE"
+      }
+    },
+    {
+      "eventId": "evt_90acbd4ca57d4000a68f",
       "eventType": "CommandeValidee",
       "eventVersion": 1,
-      "occurredAt": "2026-10-07T10:15:00Z",
+      "occurredAt": "2026-11-16T14:58:57.949Z",
       "correlationId": "corr_cmd_1001",
       "emetteur": "commande",
       "recepteur": "livraison",
       "aggregateId": "cmd_1001",
-      "aggregateVersion": 2,
+      "aggregateVersion": 3,
       "operationReplica": "CREER",
       "modification": {
         "donneeAgregatModifiee": "commandeLivrable[cmd_1001]",
+        "cible": {
+          "commandeId": "cmd_1001"
+        },
         "ancienneValeur": null,
         "nouvelleValeur": {
           "commandeId": "cmd_1001",
@@ -118,38 +231,25 @@
       }
     },
     {
-      "eventId": "evt_004",
-      "eventType": "AdresseLivraisonModifiee",
-      "eventVersion": 1,
-      "occurredAt": "2026-10-07T10:16:00Z",
-      "correlationId": "corr_cmd_1001",
-      "emetteur": "commande",
-      "recepteur": "livraison",
-      "aggregateId": "cmd_1001",
-      "aggregateVersion": 3,
-      "operationReplica": "METTRE_A_JOUR",
-      "modification": {
-        "donneeAgregatModifiee": "commandeLivrable[cmd_1001].client.adresseLivraison.ligne1",
-        "ancienneValeur": "8 avenue Parmentier",
-        "nouvelleValeur": "10 avenue Parmentier"
-      }
-    },
-    {
-      "eventId": "evt_005",
+      "eventId": "evt_75400a5f9a214587817f",
       "eventType": "CommandeValidee",
       "eventVersion": 1,
-      "occurredAt": "2026-10-07T10:15:00Z",
+      "occurredAt": "2026-11-16T14:58:57.949Z",
       "correlationId": "corr_cmd_1001",
       "emetteur": "commande",
       "recepteur": "suivi",
       "aggregateId": "cmd_1001",
-      "aggregateVersion": 2,
+      "aggregateVersion": 3,
       "operationReplica": "CREER",
       "modification": {
         "donneeAgregatModifiee": "suivis[cmd_1001]",
+        "cible": {
+          "commandeId": "cmd_1001"
+        },
         "ancienneValeur": null,
         "nouvelleValeur": {
           "commandeId": "cmd_1001",
+          "clientId": "cli_18",
           "restaurant": {
             "nom": "Le Bistrot Vert"
           },
@@ -163,10 +263,38 @@
       }
     },
     {
-      "eventId": "evt_006",
+      "eventId": "evt_572f2596eafd46cc9b41",
+      "eventType": "AdresseLivraisonModifiee",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-16T14:58:57.983Z",
+      "correlationId": "corr_cmd_1001",
+      "emetteur": "commande",
+      "recepteur": "livraison",
+      "aggregateId": "cmd_1001",
+      "aggregateVersion": 4,
+      "operationReplica": "METTRE_A_JOUR",
+      "modification": {
+        "donneeAgregatModifiee": "commandeLivrable[cmd_1001].client.adresseLivraison",
+        "cible": {
+          "commandeId": "cmd_1001"
+        },
+        "ancienneValeur": {
+          "ligne1": "8 avenue Parmentier",
+          "codePostal": "75011",
+          "ville": "Paris"
+        },
+        "nouvelleValeur": {
+          "ligne1": "10 avenue Parmentier",
+          "codePostal": "75011",
+          "ville": "Paris"
+        }
+      }
+    },
+    {
+      "eventId": "evt_1aac9e53326f4f098082",
       "eventType": "LivraisonCreee",
       "eventVersion": 1,
-      "occurredAt": "2026-10-07T10:15:02Z",
+      "occurredAt": "2026-11-16T14:58:57.955Z",
       "correlationId": "corr_cmd_1001",
       "emetteur": "livraison",
       "recepteur": "suivi",
@@ -175,27 +303,81 @@
       "operationReplica": "METTRE_A_JOUR",
       "modification": {
         "donneeAgregatModifiee": "suivis[cmd_1001].livraison",
+        "cible": {
+          "commandeId": "cmd_1001",
+          "livraisonId": "liv_501"
+        },
         "ancienneValeur": null,
         "nouvelleValeur": {
           "livraisonId": "liv_501",
           "statut": "EN_PREPARATION",
-          "date": "2026-10-07T10:15:02Z"
+          "date": "2026-11-16T14:58:57.955Z"
         }
       }
     },
     {
-      "eventId": "evt_007",
+      "eventId": "evt_000a7e5018be45339460",
+      "eventType": "LivraisonCreee",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-16T14:58:57.955Z",
+      "correlationId": "corr_cmd_1001",
+      "emetteur": "livraison",
+      "recepteur": "commande",
+      "aggregateId": "liv_501",
+      "aggregateVersion": 1,
+      "operationReplica": "CREER",
+      "modification": {
+        "donneeAgregatModifiee": "etatLivraison[cmd_1001]",
+        "cible": {
+          "commandeId": "cmd_1001",
+          "livraisonId": "liv_501"
+        },
+        "ancienneValeur": null,
+        "nouvelleValeur": {
+          "livraisonId": "liv_501",
+          "statut": "EN_PREPARATION",
+          "date": "2026-11-16T14:58:57.955Z"
+        }
+      }
+    },
+    {
+      "eventId": "evt_afed00dc3560450bb729",
       "eventType": "StatutLivraisonModifie",
       "eventVersion": 1,
-      "occurredAt": "2026-10-07T10:40:00Z",
+      "occurredAt": "2026-11-16T14:58:58.268Z",
       "correlationId": "corr_cmd_1001",
       "emetteur": "livraison",
       "recepteur": "suivi",
       "aggregateId": "liv_501",
-      "aggregateVersion": 2,
+      "aggregateVersion": 3,
       "operationReplica": "METTRE_A_JOUR",
       "modification": {
         "donneeAgregatModifiee": "suivis[cmd_1001].statutLivraison",
+        "cible": {
+          "commandeId": "cmd_1001",
+          "livraisonId": "liv_501"
+        },
+        "ancienneValeur": "EN_PREPARATION",
+        "nouvelleValeur": "EN_ROUTE"
+      }
+    },
+    {
+      "eventId": "evt_0ec6f2bc213b4f8eb742",
+      "eventType": "StatutLivraisonModifie",
+      "eventVersion": 1,
+      "occurredAt": "2026-11-16T14:58:58.268Z",
+      "correlationId": "corr_cmd_1001",
+      "emetteur": "livraison",
+      "recepteur": "commande",
+      "aggregateId": "liv_501",
+      "aggregateVersion": 3,
+      "operationReplica": "METTRE_A_JOUR",
+      "modification": {
+        "donneeAgregatModifiee": "etatLivraison[cmd_1001].statut",
+        "cible": {
+          "commandeId": "cmd_1001",
+          "livraisonId": "liv_501"
+        },
         "ancienneValeur": "EN_PREPARATION",
         "nouvelleValeur": "EN_ROUTE"
       }

@@ -1,75 +1,180 @@
 {
   "projet": "Tastigo",
-  "version": 1,
+  "version": 2,
+  "description": "Demandes de traitement exposees par les services (API HTTP). Les ports sont ceux de docker-compose.yml.",
   "commandes": [
+    {
+      "commandType": "CreerRestaurant",
+      "service": "restaurant",
+      "http": "POST http://localhost:8001/restaurants",
+      "agregat": "Restaurant",
+      "donnees": { "nom": "Burger Lab", "adresse": { "ligne1": "3 rue du Faubourg Saint-Denis", "codePostal": "75010", "ville": "Paris" }, "horaires": [], "plats": [] },
+      "regles": ["adresse complete", "prix strictement positifs", "statut initial BROUILLON"],
+      "evenementsProduits": []
+    },
     {
       "commandType": "PublierRestaurant",
       "service": "restaurant",
+      "http": "POST http://localhost:8001/restaurants/rest_42/publier",
       "agregat": "Restaurant",
       "identifiantAgregat": "rest_42",
-      "donnees": { "restaurantId": "rest_42" },
-      "regles": ["adresse obligatoire", "au moins un horaire", "au moins un plat"],
-      "evenementProduit": "RestaurantPublie"
+      "donnees": {},
+      "regles": ["statut BROUILLON", "au moins un horaire", "au moins un plat"],
+      "evenementsProduits": ["RestaurantPublie vers commande"]
+    },
+    {
+      "commandType": "AjouterPlat",
+      "service": "restaurant",
+      "http": "POST http://localhost:8001/restaurants/rest_42/plats",
+      "agregat": "Restaurant",
+      "identifiantAgregat": "rest_42",
+      "donnees": { "nom": "Falafel wrap", "prix": { "montant": 990, "devise": "EUR" } },
+      "regles": ["platId unique dans le restaurant", "prix strictement positif"],
+      "evenementsProduits": ["MenuMisAJour (champ plat) vers commande, si le restaurant a deja ete publie"]
     },
     {
       "commandType": "ModifierPrixPlat",
       "service": "restaurant",
+      "http": "PUT http://localhost:8001/restaurants/rest_42/plats/plat_7/prix",
       "agregat": "Restaurant",
       "identifiantAgregat": "rest_42",
-      "donnees": { "platId": "plat_7", "nouveauPrix": { "montant": 1290, "devise": "EUR" } },
-      "regles": ["prix strictement positif", "plat appartenant au restaurant"],
-      "evenementProduit": "MenuMisAJour"
+      "donnees": { "montant": 1290, "devise": "EUR" },
+      "regles": ["prix strictement positif", "plat appartenant au restaurant", "valeur differente"],
+      "evenementsProduits": ["MenuMisAJour (champ prix) vers commande, si le restaurant a deja ete publie"]
+    },
+    {
+      "commandType": "ChangerDisponibilitePlat",
+      "service": "restaurant",
+      "http": "PUT http://localhost:8001/restaurants/rest_51/plats/plat_21/disponibilite",
+      "agregat": "Restaurant",
+      "identifiantAgregat": "rest_51",
+      "donnees": { "disponible": false },
+      "regles": ["plat appartenant au restaurant", "valeur differente"],
+      "evenementsProduits": ["MenuMisAJour (champ disponible) vers commande, si le restaurant a deja ete publie"]
+    },
+    {
+      "commandType": "ModifierStatutRestaurant",
+      "service": "restaurant",
+      "http": "PUT http://localhost:8001/restaurants/rest_63/statut",
+      "agregat": "Restaurant",
+      "identifiantAgregat": "rest_63",
+      "donnees": { "statut": "INDISPONIBLE" },
+      "regles": ["restaurant deja publie", "PUBLIE <-> INDISPONIBLE"],
+      "evenementsProduits": ["StatutRestaurantModifie vers commande"]
     },
     {
       "commandType": "CreerCommande",
       "service": "commande",
+      "http": "POST http://localhost:8002/commandes",
       "agregat": "Commande",
-      "identifiantAgregat": "cmd_1001",
-      "donnees": { "clientId": "cli_18", "restaurantId": "rest_42" },
-      "regles": ["restaurant present dans le replica local"]
+      "donnees": {
+        "restaurantId": "rest_42",
+        "client": {
+          "clientId": "cli_18",
+          "nom": "Camille Martin",
+          "telephone": "+33612000000",
+          "adresseLivraison": { "ligne1": "8 avenue Parmentier", "codePostal": "75011", "ville": "Paris" }
+        }
+      },
+      "regles": ["restaurant present dans le replica local", "restaurant PUBLIE dans le replica"],
+      "evenementsProduits": []
     },
     {
       "commandType": "AjouterLigneCommande",
       "service": "commande",
+      "http": "POST http://localhost:8002/commandes/cmd_1001/lignes",
       "agregat": "Commande",
       "identifiantAgregat": "cmd_1001",
       "donnees": { "platId": "plat_7", "quantite": 2 },
-      "regles": ["plat disponible dans le replica", "quantite superieure ou egale a 1"]
+      "regles": ["commande BROUILLON", "plat present et disponible dans le replica", "quantite entre 1 et 50", "nom et prix copies dans la ligne"],
+      "evenementsProduits": []
+    },
+    {
+      "commandType": "RetirerLigneCommande",
+      "service": "commande",
+      "http": "DELETE http://localhost:8002/commandes/cmd_1001/lignes/ligne_1",
+      "agregat": "Commande",
+      "identifiantAgregat": "cmd_1001",
+      "donnees": {},
+      "regles": ["commande BROUILLON", "ligne existante", "total recalcule"],
+      "evenementsProduits": []
     },
     {
       "commandType": "ValiderCommande",
       "service": "commande",
+      "http": "POST http://localhost:8002/commandes/cmd_1001/valider",
       "agregat": "Commande",
       "identifiantAgregat": "cmd_1001",
       "donnees": {},
-      "regles": ["au moins une ligne", "total recalcule", "statut BROUILLON"],
+      "regles": ["commande BROUILLON", "au moins une ligne", "restaurant PUBLIE et plats encore disponibles dans le replica", "total recalcule"],
       "evenementsProduits": ["CommandeValidee vers livraison", "CommandeValidee vers suivi"]
     },
     {
       "commandType": "ModifierAdresseLivraison",
       "service": "commande",
+      "http": "PUT http://localhost:8002/commandes/cmd_1001/adresse-livraison",
       "agregat": "Commande",
       "identifiantAgregat": "cmd_1001",
-      "donnees": { "ligne1": "10 avenue Parmentier" },
-      "regles": ["livraison pas encore EN_ROUTE"],
-      "evenementProduit": "AdresseLivraisonModifiee"
+      "donnees": { "ligne1": "10 avenue Parmentier", "codePostal": "75011", "ville": "Paris" },
+      "regles": [
+        "commande BROUILLON ou VALIDEE",
+        "replica etatLivraison ni EN_ROUTE ni LIVREE (verifie localement par Commande)",
+        "a la reception, Livraison rejette aussi la modification si le livreur est deja parti"
+      ],
+      "evenementsProduits": ["AdresseLivraisonModifiee vers livraison, si la commande est VALIDEE"]
     },
     {
       "commandType": "AffecterLivreur",
       "service": "livraison",
+      "http": "POST http://localhost:8003/livraisons/liv_501/livreur",
       "agregat": "Livraison",
       "identifiantAgregat": "liv_501",
       "donnees": { "livreurId": "livreur_12", "nom": "Samir" },
-      "regles": ["livraison EN_PREPARATION"]
+      "regles": ["livraison EN_PREPARATION"],
+      "evenementsProduits": []
     },
     {
       "commandType": "ModifierStatutLivraison",
       "service": "livraison",
+      "http": "PUT http://localhost:8003/livraisons/liv_501/statut",
       "agregat": "Livraison",
       "identifiantAgregat": "liv_501",
-      "donnees": { "nouveauStatut": "EN_ROUTE" },
-      "regles": ["livreur affecte", "transition de statut autorisee"],
-      "evenementProduit": "StatutLivraisonModifie"
+      "donnees": { "statut": "EN_ROUTE" },
+      "regles": ["transitions EN_PREPARATION -> EN_ROUTE -> LIVREE", "livreur affecte pour EN_ROUTE"],
+      "evenementsProduits": ["StatutLivraisonModifie vers suivi", "StatutLivraisonModifie vers commande"]
+    },
+    {
+      "commandType": "ReconstruireProjection",
+      "service": "suivi",
+      "http": "POST http://localhost:8004/admin/reconstruire",
+      "agregat": "SuiviCommande",
+      "donnees": {},
+      "regles": ["supprime la projection puis rejoue la boite de reception evenements:vers:suivi"],
+      "evenementsProduits": []
     }
+  ],
+  "reactions": [
+    {
+      "declencheur": "CommandeValidee",
+      "service": "livraison",
+      "effet": "cree le replica commandeLivrable et l'agregat Livraison (une seule par commande)",
+      "evenementsProduits": ["LivraisonCreee vers suivi", "LivraisonCreee vers commande"]
+    }
+  ],
+  "requetes": [
+    { "service": "restaurant", "http": "GET /restaurants?ville=Paris&statut=PUBLIE" },
+    { "service": "restaurant", "http": "GET /restaurants/{restaurantId}/menu" },
+    { "service": "restaurant", "http": "GET /plats/recherche?q=falafel" },
+    { "service": "restaurant", "http": "GET /statistiques" },
+    { "service": "restaurant", "http": "GET /outbox?publie=false" },
+    { "service": "commande", "http": "GET /catalogue et GET /catalogue/{restaurantId} (replica)" },
+    { "service": "commande", "http": "GET /commandes/{commandeId}" },
+    { "service": "commande", "http": "GET /clients/{clientId}/commandes" },
+    { "service": "livraison", "http": "GET /livraisons?statut=EN_ROUTE" },
+    { "service": "livraison", "http": "GET /commandes/{commandeId}/livraison" },
+    { "service": "livraison", "http": "GET /replicas/commandes/{commandeId} (replica)" },
+    { "service": "suivi", "http": "GET /suivis/{commandeId}" },
+    { "service": "suivi", "http": "GET /clients/{clientId}/suivis" },
+    { "service": "commande, livraison, suivi", "http": "GET /evenements (traites, rejetes, outbox)" }
   ]
 }

@@ -1,56 +1,53 @@
-# Étape 4 — Découplage et événements
+# Découplage et événements
 
-Les exemples complets sont dans [`../Events.json`](../Events.json). Chaque contrat identifie explicitement l'émetteur, le récepteur, la donnée modifiée et sa nouvelle valeur.
+Les contrats sont dans [`../Events.json`](../Events.json). Les exemples sont des événements réellement produits par les services pendant `scripts/demo.py`.
 
 ## Enveloppe commune
-
-Tous les événements utilisent les métadonnées suivantes :
 
 - `eventId` : identifiant unique utilisé pour l'idempotence ;
 - `eventType` et `eventVersion` : nom et version du contrat ;
 - `occurredAt` : date UTC du fait métier ;
-- `correlationId` : lien entre les événements d'un même parcours ;
+- `correlationId` : lien entre les événements d'un même parcours (`corr_cmd_1001`) ;
 - `emetteur` et `recepteur` : direction du flux ;
 - `aggregateId` et `aggregateVersion` : source et ordre des changements ;
 - `operationReplica` : `CREER` ou `METTRE_A_JOUR` ;
-- `modification` : chemin de la donnée, ancienne valeur et nouvelle valeur.
+- `modification` : chemin de la donnée (`donneeAgregatModifiee`), identifiants structurés (`cible`), ancienne et nouvelle valeur.
 
-## Catalogue Restaurant vers Commande
+## Transport : Redis Streams
 
-### Création du réplica
+Le bus est une instance Redis dédiée (`tastigo-bus`). Chaque service possède une boîte de réception `evenements:vers:<service>`. Le récepteur la lit avec un groupe de consommateurs :
 
-`RestaurantPublie` est émis par Restaurant et reçu par Commande. Il crée `catalogueRestaurants[restaurantId]` avec le nom, le statut et le menu minimal.
+1. `XREADGROUP` délivre l'événement ;
+2. le service applique la modification dans sa propre base ;
+3. `XACK` acquitte l'événement.
 
-### Mise à jour du réplica
+Un événement non acquitté (panne pendant le traitement) reste dans la liste des messages en attente du groupe et est relu au redémarrage. Les flux ne sont pas tronqués : ils servent aussi de journal pour reconstruire une projection.
 
-`MenuMisAJour` transporte précisément le champ changé. Dans l'exemple, le prix de `plat_7` passe de 12,50 € à 12,90 €. Commande met à jour son catalogue, mais ne réécrit pas les commandes déjà validées.
+## Publication fiable : outbox transactionnelle
 
-## Commande vers Livraison
+Un service n'écrit jamais sur le bus pendant une commande. Il écrit l'événement dans **sa propre base, dans la même transaction que l'agrégat** :
 
-### Création du réplica
-
-`CommandeValidee` est émis par Commande et reçu par Livraison. Il crée `commandeLivrable[commandeId]`, puis permet de créer exactement une `Livraison` grâce à l'unicité de `commandeId`.
-
-### Mise à jour du réplica
-
-`AdresseLivraisonModifiee` est accepté tant que la livraison n'est pas partie. Il remplace uniquement le champ d'adresse indiqué. Si l'événement arrive après le passage à `EN_ROUTE`, Livraison le refuse et signale l'échec fonctionnel.
-
-## Vers le service Suivi
-
-- `CommandeValidee` crée la projection initiale.
-- `LivraisonCreee` lui ajoute l'identifiant de livraison et le statut initial.
-- `StatutLivraisonModifie` remplace le statut courant et ajoute une entrée à la chronologie.
-
-## Traitement fiable
-
-Le producteur enregistre le changement métier et l'événement dans une même transaction locale (*outbox*). Un processus publie ensuite cet événement sur le bus. Le consommateur vérifie `eventId`, contrôle `aggregateVersion`, applique sa transaction locale puis marque l'événement comme traité.
-
-Ce mécanisme autorise une livraison *au moins une fois* : recevoir deux fois le même événement ne produit pas deux livraisons ni deux entrées de chronologie.
-
-## Matrice de couverture
-
-| Réplica | Événement de création | Événement de mise à jour |
+| Service | Outbox | Atomicité |
 |---|---|---|
-| Catalogue dans Commande | `RestaurantPublie` | `MenuMisAJour` |
-| Commande livrable dans Livraison | `CommandeValidee` | `AdresseLivraisonModifiee` |
-| Vue client dans Suivi | `CommandeValidee` | `LivraisonCreee`, `StatutLivraisonModifie` |
+| Restaurant | collection MongoDB `outbox` | transaction multi-documents (replica set) |
+| Commande, Livraison | `STREAM outbox` dans sa base Redis | bloc `MULTI` / `EXEC` |
+
+Un relais recopie ensuite l'outbox sur le bus (`publie: true` dans MongoDB, `outbox:curseur` dans Redis). Si le relais tombe entre la publication et le marquage, l'événement est republié : c'est le récepteur qui gère le doublon.
+
+## Traitement par le récepteur
+
+1. `eventId` déjà présent dans `evenements:traites` : ignoré (idempotence).
+2. `aggregateVersion` ≤ `sourceVersion` du réplica : ignoré (ordre).
+3. Règle métier violée : l'événement est acquitté et tracé dans `evenements:rejetes`.
+4. Sinon : modification du réplica et ajout de l'`eventId` dans le même `MULTI`.
+
+## Flux
+
+| Réplica | Émetteur → récepteur | Création | Mise à jour |
+|---|---|---|---|
+| Catalogue dans Commande | Restaurant → Commande | `RestaurantPublie` | `MenuMisAJour` (prix, disponibilité, nouveau plat), `StatutRestaurantModifie` |
+| Commande livrable dans Livraison | Commande → Livraison | `CommandeValidee` | `AdresseLivraisonModifiee` |
+| État de livraison dans Commande | Livraison → Commande | `LivraisonCreee` | `StatutLivraisonModifie` |
+| Projection dans Suivi | Commande, Livraison → Suivi | `CommandeValidee` | `LivraisonCreee`, `StatutLivraisonModifie` |
+
+Un restaurant en `BROUILLON` n'émet rien : il n'est jamais visible des autres services. Quand un événement intéresse deux récepteurs avec des besoins différents (`CommandeValidee`), l'émetteur produit deux événements, chacun avec la seule donnée utile à son récepteur.

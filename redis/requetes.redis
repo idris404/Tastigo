@@ -1,0 +1,44 @@
+# Requetes de lecture sur les bases Redis des services (instance tastigo-redis).
+# Execution : ./redis/run.sh   (a lancer apres python scripts/demo.py)
+# Aucune ecriture : seules les API des services modifient les donnees.
+
+# ---------------------------------------------------------------- Commande (DB 2)
+SELECT 2
+ECHO "===== COMMANDE (DB 2) : catalogue replique depuis Restaurant"
+SMEMBERS catalogue:restaurants
+HGETALL catalogue:restaurant:rest_42
+SMEMBERS catalogue:restaurant:rest_42:plats
+HGETALL catalogue:plat:rest_42:plat_7
+ECHO "===== COMMANDE (DB 2) : agregat cmd_1001"
+HGETALL commande:cmd_1001
+LRANGE commande:cmd_1001:lignes 0 -1
+HGETALL commande:cmd_1001:ligne:ligne_1
+ECHO "===== COMMANDE (DB 2) : index secondaires"
+ZRANGE commandes:client:cli_18 0 -1 WITHSCORES
+SMEMBERS commandes:statut:VALIDEE
+ECHO "===== COMMANDE (DB 2) : replica de l'etat de livraison"
+HGETALL replica:livraison:cmd_1001
+ECHO "===== COMMANDE (DB 2) : outbox locale et idempotence"
+XLEN outbox
+GET outbox:curseur
+SCARD evenements:traites
+
+# ---------------------------------------------------------------- Livraison (DB 3)
+SELECT 3
+ECHO "===== LIVRAISON (DB 3) : replica de la commande livrable"
+HGETALL replica:commande:cmd_1001
+ECHO "===== LIVRAISON (DB 3) : agregat liv_501"
+HGETALL livraison:liv_501
+LRANGE livraison:liv_501:historique 0 -1
+HGETALL livraisons:par-commande
+SMEMBERS livraisons:statut:LIVREE
+XLEN outbox
+SCARD evenements:traites
+
+# ---------------------------------------------------------------- Suivi (DB 4)
+SELECT 4
+ECHO "===== SUIVI (DB 4) : projection SuiviCommande"
+HGETALL suivi:cmd_1001
+ZRANGE suivi:cmd_1001:chronologie 0 -1 WITHSCORES
+ZREVRANGE suivis:client:cli_18 0 -1
+SCARD evenements:traites

@@ -1,0 +1,63 @@
+// Architecture Tastigo - générer avec :
+//   dot -Tsvg docs/architecture.dot -o docs/architecture.svg
+//   dot -Tpng -Gdpi=200 docs/architecture.dot -o docs/architecture.png
+digraph tastigo {
+  rankdir=LR;
+  newrank=true;
+  graph [fontname="Helvetica", fontsize=12, nodesep=0.35, ranksep=1.1, pad=0.3, bgcolor="white"];
+  node  [fontname="Helvetica", fontsize=11, margin="0.15,0.08"];
+  edge  [fontname="Helvetica", fontsize=9, color="#4a5568", fontcolor="#2d3748", arrowsize=0.7];
+
+
+  subgraph cluster_restaurant {
+    label="Service Restaurant  :8001"; labeljust=l; style="rounded,filled"; fillcolor="#e9f5ee"; color="#2f855a";
+    restaurant [label="API FastAPI\n+ relais outbox", shape=box, style="rounded,filled", fillcolor="white", color="#2f855a"];
+    mongo [label="MongoDB (replica set)\nrestaurants · outbox", shape=cylinder, style=filled, fillcolor="#c6e8d3", color="#2f855a"];
+    restaurant -> mongo [label="transaction\nagrégat + outbox", dir=both, arrowtail=none];
+  }
+
+  subgraph cluster_bus {
+    label="Bus d'événements  ·  Redis Streams (tastigo-bus)"; labeljust=l; style="rounded,filled"; fillcolor="#fef6e4"; color="#c05621";
+    vers_commande  [label="evenements:vers:commande",  shape=cds, style=filled, fillcolor="#fbd38d", color="#c05621"];
+    vers_livraison [label="evenements:vers:livraison", shape=cds, style=filled, fillcolor="#fbd38d", color="#c05621"];
+    vers_suivi     [label="evenements:vers:suivi",     shape=cds, style=filled, fillcolor="#fbd38d", color="#c05621"];
+  }
+
+  subgraph cluster_commande {
+    label="Service Commande  :8002"; labeljust=l; style="rounded,filled"; fillcolor="#ebf4ff"; color="#2b6cb0";
+    commande [label="API FastAPI\nconsommateur + relais", shape=box, style="rounded,filled", fillcolor="white", color="#2b6cb0"];
+    redis2 [label="Redis DB 2\nCommande · outbox\nréplica catalogue\nréplica état livraison", shape=cylinder, style=filled, fillcolor="#bee3f8", color="#2b6cb0"];
+    commande -> redis2 [label="MULTI/EXEC"];
+  }
+
+  subgraph cluster_livraison {
+    label="Service Livraison  :8003"; labeljust=l; style="rounded,filled"; fillcolor="#faf0ff"; color="#6b46c1";
+    livraison [label="API FastAPI\nconsommateur + relais", shape=box, style="rounded,filled", fillcolor="white", color="#6b46c1"];
+    redis3 [label="Redis DB 3\nLivraison · outbox\nréplica commande livrable", shape=cylinder, style=filled, fillcolor="#e9d8fd", color="#6b46c1"];
+    livraison -> redis3 [label="MULTI/EXEC"];
+  }
+
+  subgraph cluster_suivi {
+    label="Service Suivi  :8004"; labeljust=l; style="rounded,filled"; fillcolor="#fff5f5"; color="#c53030";
+    suivi [label="API FastAPI\nconsommateur", shape=box, style="rounded,filled", fillcolor="white", color="#c53030"];
+    redis4 [label="Redis DB 4\nprojection SuiviCommande", shape=cylinder, style=filled, fillcolor="#fed7d7", color="#c53030"];
+    suivi -> redis4;
+  }
+
+  { rank=same; restaurant; commande; }
+  { rank=same; vers_commande; vers_livraison; vers_suivi; }
+  { rank=same; livraison; suivi; }
+
+
+  // publications (producteur -> boîte du récepteur)
+  restaurant -> vers_commande  [label="RestaurantPublie\nMenuMisAJour\nStatutRestaurantModifie", color="#2f855a", fontcolor="#22543d", penwidth=1.4];
+  commande   -> vers_livraison [label="CommandeValidee\nAdresseLivraisonModifiee", color="#2b6cb0", fontcolor="#2a4365", penwidth=1.4];
+  commande   -> vers_suivi     [label="CommandeValidee", color="#2b6cb0", fontcolor="#2a4365", penwidth=1.4];
+  livraison  -> vers_suivi     [label="LivraisonCreee\nStatutLivraisonModifie", color="#6b46c1", fontcolor="#44337a", penwidth=1.4, constraint=false];
+  livraison  -> vers_commande  [label="LivraisonCreee\nStatutLivraisonModifie", color="#6b46c1", fontcolor="#44337a", penwidth=1.4, constraint=false];
+
+  // consommations (XREADGROUP / XACK)
+  vers_commande  -> commande  [label="XREADGROUP", style=bold, color="#c05621", fontcolor="#7b341e", constraint=false];
+  vers_livraison -> livraison [label="XREADGROUP", style=bold, color="#c05621", fontcolor="#7b341e"];
+  vers_suivi     -> suivi     [label="XREADGROUP", style=bold, color="#c05621", fontcolor="#7b341e"];
+}

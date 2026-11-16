@@ -1,166 +1,167 @@
 # Tastigo
 
-Tastigo est une application pédagogique de livraison de repas inspirée des plateformes de livraison, avec un périmètre volontairement réduit. Un client consulte les restaurants et leurs menus, valide une commande, puis suit sa livraison.
+Tastigo est une application pédagogique de livraison de repas. Un client consulte les restaurants, compose et valide une commande, puis suit sa livraison.
 
-Le projet illustre un découpage en services autonomes : chaque service possède ses données, échange des événements et conserve uniquement les réplicas nécessaires à son fonctionnement.
+Le projet illustre un découpage en **services autonomes** : chaque service possède son agrégat et sa base NoSQL, les services échangent des **événements** sur un bus, et chacun conserve les **réplicas** dont il a besoin, mis à jour par ces événements.
+
+Les **deux niveaux** du sujet sont livrés :
+
+| Niveau | Contenu | Commande |
+|---|---|---|
+| 1 — sans programmation des services | MongoDB et Redis remplis par scripts (`mongosh`, `redis-cli`), réplicas mis à jour par événements, requêtes de consultation | `./niveau1/run.sh` |
+| 2 — services programmés | 4 services Python / FastAPI qui utilisent MongoDB et Redis et s'échangent des événements sur un bus Redis Streams | `./scripts/demo.sh --reset` |
 
 ## Équipe et dépôt
 
 - Idris — [@idris404](https://github.com/idris404)
 - Rayan — [@issiakhemrayan](https://github.com/issiakhemrayan)
-- Encadrant invité comme collaborateur avec accès en écriture — [@charroux](https://github.com/charroux) (acceptation en attente)
+- Encadrant invité comme collaborateur avec accès en écriture — [@charroux](https://github.com/charroux)
 - Dépôt — [github.com/idris404/Tastigo](https://github.com/idris404/Tastigo)
+- Rapport — [`docs/rapport-tastigo.pdf`](docs/rapport-tastigo.pdf)
 
-## Parcours métier
+## Architecture
 
-1. Le service **Restaurant** publie les restaurants et leurs menus.
-2. Le service **Commande** reçoit une copie des données de catalogue utiles, puis enregistre et valide les commandes.
-3. Le service **Livraison** reçoit le snapshot d'une commande validée et organise son acheminement.
-4. Le service **Suivi** transforme les événements reçus en une vue simple destinée au client.
+![Architecture Tastigo](docs/architecture.svg)
 
-```mermaid
-flowchart LR
-    R[Restaurant<br/>catalogue source] -->|RestaurantPublie<br/>MenuMisAJour| C[Commande<br/>catalogue répliqué]
-    C -->|CommandeValidee<br/>AdresseLivraisonModifiee| L[Livraison<br/>commande répliquée]
-    C -->|CommandeValidee| S[Suivi<br/>projection client]
-    L -->|LivraisonCreee<br/>StatutLivraisonModifie| S
+| Service | Port | Base | Agrégat propriétaire | Réplicas (alimentés par événements) |
+|---|---|---|---|---|
+| Restaurant | 8001 | MongoDB `tastigo_restaurant` | `Restaurant` (+ plats) | aucun |
+| Commande | 8002 | Redis DB 2 | `Commande` (+ lignes) | catalogue des restaurants, état des livraisons |
+| Livraison | 8003 | Redis DB 3 | `Livraison` | commande livrable (client, restaurant, total) |
+| Suivi | 8004 | Redis DB 4 | projection `SuiviCommande` | résumé de commande + état de livraison |
+| bus | 6380 | Redis Streams | — | une boîte de réception par service |
+
+- **Restaurant → Commande** : `RestaurantPublie` crée le réplica du catalogue ; `MenuMisAJour` et `StatutRestaurantModifie` le mettent à jour.
+- **Commande → Livraison** : `CommandeValidee` crée le réplica de la commande et la livraison ; `AdresseLivraisonModifiee` le met à jour.
+- **Livraison → Commande** : `LivraisonCreee` et `StatutLivraisonModifie` tiennent à jour l'état de livraison connu de Commande.
+- **Commande et Livraison → Suivi** : les mêmes événements construisent la projection client.
+
+Détails : [services](docs/services.md) · [agrégats et réplicas](docs/aggregats.md) · [événements](docs/evenements.md) · [projection](docs/projection.md) · [bases NoSQL](docs/bases-nosql.md).
+
+## Garanties mises en œuvre
+
+| Garantie | Mécanisme |
+|---|---|
+| Publication fiable | outbox écrite dans la même transaction que l'agrégat (transaction MongoDB, `MULTI` Redis), puis relais vers le bus |
+| Livraison au moins une fois | groupes de consommateurs Redis Streams, `XACK` après traitement, reprise des messages en attente |
+| Idempotence | `SET evenements:traites` : un `eventId` déjà appliqué est ignoré |
+| Ordre | `aggregateVersion` comparée à la `sourceVersion` du réplica |
+| Concurrence | verrou optimiste : filtre sur `version` (MongoDB), `WATCH` (Redis) |
+| Autonomie | chaque service décide sur ses propres données ; un service arrêté rattrape ses événements au redémarrage |
+| Reconstruction | `POST /admin/reconstruire` rejoue les événements de Suivi |
+| Traçabilité | `correlationId` commun à tout le parcours d'une commande ; rejets métier dans `evenements:rejetes` |
+
+## Niveau 1 — bases remplies et interrogeables, sans service
+
+Prérequis : Docker Desktop et un shell POSIX (Git Bash sous Windows).
+
+```bash
+./niveau1/run.sh
 ```
 
-![Modèle des agrégats et événements](docs/tastigo-aggregates-events.svg)
+Le script n'utilise que `mongosh` et `redis-cli`, sur des bases séparées de celles du niveau 2 (MongoDB `tastigo_niveau1`, Redis DB 12 à 15) :
 
-## Services
+1. [`niveau1/mongodb/remplir.js`](niveau1/mongodb/remplir.js) crée les collections validées, les index, les 4 restaurants et 6 événements dans l'outbox ;
+2. [`niveau1/mongodb/outbox-vers-redis.js`](niveau1/mongodb/outbox-vers-redis.js) relaie l'outbox : chaque événement est publié sur le flux `evenements:vers:commande` (DB 15) puis appliqué au réplica du catalogue de Commande (DB 12) dans un `MULTI`, avec son `eventId` mémorisé ;
+3. [`niveau1/redis/scenario.redis`](niveau1/redis/scenario.redis) joue les échanges Commande → Livraison → Suivi : chaque émetteur modifie son agrégat et son outbox dans un même `MULTI`, l'événement passe par le bus, le récepteur met à jour son réplica ;
+4. les requêtes MongoDB ([`mongodb/requetes.js`](mongodb/requetes.js)) et Redis ([`niveau1/redis/requetes.redis`](niveau1/redis/requetes.redis)) sont exécutées, puis 12 vérifications.
 
-| Service | Responsabilité | Données dont il est propriétaire | Données répliquées |
-|---|---|---|---|
-| Restaurant | Gérer les restaurants, horaires, plats, prix et disponibilités | `Restaurant`, `Plat` | Aucune |
-| Commande | Constituer un panier, figer les prix et valider une commande | `Commande`, `LigneCommande` | Catalogue minimal des restaurants |
-| Livraison | Affecter un livreur et faire progresser la livraison | `Livraison` | Snapshot de la commande, du client et du restaurant |
-| Suivi | Préparer une vue de lecture pour le client | Projection `SuiviCommande` | Résumé de commande et état de livraison |
+Résultat attendu : `NIVEAU1_OK bases=MongoDB+Redis restaurants=4 replicas=4 evenements=15`.
 
-Le détail des frontières et des responsabilités se trouve dans [la définition des services](docs/services.md).
+Les événements, versions et dates sont ceux de [`Events.json`](Events.json) : le niveau 1 montre « à la main » exactement ce que les services du niveau 2 font automatiquement.
 
-## Bases NoSQL
+## Niveau 2 — services programmés
 
-- **MongoDB — service Restaurant** : un restaurant, son adresse, ses horaires et ses plats sont conservés dans un même document. Ce modèle permet de lire un catalogue complet en une seule requête et correspond à la structure imbriquée de l'agrégat `Restaurant`.
-- **Redis — services Commande, Livraison et Suivi** : les agrégats sont représentés par des `HASH`, `LIST`, `SET`, `ZSET` et `STREAM`. Redis convient aux lectures rapides par identifiant, aux index simples, aux changements de statut et à la projection de lecture.
+Prérequis : Docker Desktop et Python 3 (bibliothèque standard uniquement, pour le scénario).
 
-Chaque service reste propriétaire de ses données. La collection MongoDB `outbox` contient les événements Restaurant destinés au réplica de catalogue du service Commande.
+```bash
+docker compose up -d --build --wait     # bases, bus et 4 services
+python scripts/demo.py                  # scénario complet vérifié
+```
 
-## Agrégats et règles principales
+Ou en une commande depuis Git Bash / Linux / macOS : `./scripts/demo.sh --reset` (repart de bases vides).
 
-- **Restaurant** est la racine du catalogue. Un plat appartient à un seul restaurant et son prix est strictement positif.
-- **Commande** calcule `total = somme(prixUnitaire × quantite)`. Le nom et le prix du plat sont copiés au moment de l'ajout afin qu'un changement ultérieur du menu ne modifie pas une commande existante.
-- **Livraison** est unique pour une commande. Elle ne peut passer à `EN_ROUTE` que si un livreur lui est affecté.
-- **SuiviCommande** est une projection en lecture seule. Elle est reconstruisible à partir des événements.
+Au démarrage, le service Restaurant crée 4 restaurants **en passant par ses propres commandes** : les événements partent dans l'outbox et le catalogue répliqué de Commande se construit tout seul.
 
-Les exemples JSON complets sont dans [`Aggregates.json`](Aggregates.json). Les traitements demandés sont définis dans [`Commands.json`](Commands.json). Leur explication se trouve dans [la documentation des agrégats](docs/aggregats.md).
+Résultat attendu de la démonstration (extrait) :
 
-## Découplage par événements
+```text
+=== 5. MenuMisAJour : le prix change dans Restaurant, le réplica suit, la commande reste figée
+  [OK] réplica catalogue : Bowl falafel à 13,40 €
+  [OK] cmd_1001 conserve le prix payé 12,90 € (snapshot)
+...
+=== 9. Reconstruction de la projection par rejeu des événements
+  [OK] 4 événements rejoués, 1 suivis : projection identique
+...
+VALIDATION_OK verifications=23 commande=cmd_1001 livraison=liv_501 services=4 bases=MongoDB+Redis bus=RedisStreams
+```
 
-Les services ne lisent pas directement la base de données d'un autre service. Ils reçoivent des événements versionnés contenant uniquement les données nécessaires.
+Pour voir les événements circuler en direct : `docker compose logs -f restaurant commande livraison suivi`.
 
-Chaque événement contient :
+## Interroger les bases
 
-- le service émetteur et le service récepteur ;
-- l'identifiant de l'agrégat concerné ;
-- la donnée modifiée ;
-- son ancienne valeur lorsqu'elle existe ;
-- sa nouvelle valeur ;
-- un identifiant d'événement, une version et une date.
+```bash
+./mongodb/run-queries.sh    # 11 requêtes MongoDB : filtres, $unwind, texte, $group, outbox, explain, validation
+./redis/run.sh              # lecture des clés Redis des 3 services et des flux du bus
+```
 
-Les contrats exécutables sont réunis dans [`Events.json`](Events.json). La matrice des flux, la création et la mise à jour des réplicas sont détaillées dans [la documentation des événements](docs/evenements.md).
+Connexions directes : `mongodb://localhost:27017/?directConnection=true`, `redis://localhost:6379` (bases 2, 3, 4), `redis://localhost:6380` (bus).
 
-## Projection vers le service Suivi
+Chaque API est documentée par FastAPI : http://localhost:8001/docs, :8002/docs, :8003/docs, :8004/docs.
 
-Le nouveau service **Suivi** ne recopie pas les agrégats tels quels. Il transforme :
+### Exemple d'appels
 
-- `CommandeValidee` en résumé de commande visible par le client ;
-- `LivraisonCreee` en identifiant de livraison et statut initial ;
-- `StatutLivraisonModifie` en statut courant et entrée de chronologie.
+```bash
+# catalogue répliqué dans Commande
+curl localhost:8002/catalogue/rest_42
 
-Cette vue évite au front-end d'interroger plusieurs services et reste reconstruisible. Le mapping complet est décrit dans [la documentation de projection](docs/projection.md).
+# créer, remplir et valider une commande
+curl -X POST localhost:8002/commandes -H 'Content-Type: application/json' -d '{"restaurantId":"rest_42","client":{"clientId":"cli_18","nom":"Camille Martin","telephone":"+33612000000","adresseLivraison":{"ligne1":"8 avenue Parmentier","codePostal":"75011","ville":"Paris"}}}'
+curl -X POST localhost:8002/commandes/cmd_1001/lignes -H 'Content-Type: application/json' -d '{"platId":"plat_7","quantite":2}'
+curl -X POST localhost:8002/commandes/cmd_1001/valider
 
-## Garanties techniques retenues
+# la livraison et le suivi ont été créés par événements
+curl localhost:8003/commandes/cmd_1001/livraison
+curl localhost:8004/suivis/cmd_1001
+```
 
-- **Autonomie** : un service continue à lire ses réplicas si l'émetteur est temporairement indisponible.
-- **Cohérence éventuelle** : une mise à jour peut mettre un court délai à apparaître dans le service récepteur.
-- **Idempotence** : un `eventId` déjà traité est ignoré.
-- **Ordre** : `aggregateVersion` empêche l'application d'un ancien événement après un nouveau.
-- **Traçabilité** : `correlationId` relie les événements d'un même parcours métier.
-- **Évolution** : le nom d'événement et `eventVersion` versionnent le contrat.
-
-La démonstration met en œuvre ce principe : MongoDB conserve les événements Restaurant dans une collection `outbox`, le consommateur les applique au réplica Redis et chaque service garde les `eventId` déjà traités.
-
-## Arborescence du livrable
+## Arborescence
 
 ```text
 Tastigo/
 ├── README.md
-├── Aggregates.json
-├── Commands.json
-├── Events.json
-├── docker-compose.yml
-├── mongodb/
-│   ├── init/01_restaurants.js
-│   ├── 02_requetes.js
-│   └── run-queries.sh
-├── redis/
-│   ├── 02_evenements.redis
-│   └── run.sh
-├── scripts/
-│   ├── demo.sh
-│   ├── process-mongodb-outbox.sh
-│   └── validate.sh
+├── Aggregates.json          agrégats, stockage physique, réplicas et invariants
+├── Commands.json            commandes (API) et règles métier
+├── Events.json              contrats d'événements (exemples réels) et flux
+├── docker-compose.yml       MongoDB, Redis, bus Redis Streams, 4 services
+├── services/
+│   ├── Dockerfile, requirements.txt
+│   ├── common/              enveloppe d'événement, consommateur et relais d'outbox
+│   ├── restaurant/          MongoDB : schéma, jeu de données, API
+│   ├── commande/            Redis DB 2
+│   ├── livraison/           Redis DB 3
+│   └── suivi/               Redis DB 4
+├── niveau1/                 NIVEAU 1 sans service
+│   ├── run.sh               remplissage, relais, scénario, requêtes, vérifications
+│   ├── mongodb/remplir.js, outbox-vers-redis.js
+│   └── redis/scenario.redis, requetes.redis
+├── mongodb/requetes.js, run-queries.sh     requêtes communes aux deux niveaux
+├── redis/requetes.redis, bus.redis, run.sh requêtes du niveau 2
+├── scripts/demo.py, demo.sh                scénario vérifié du niveau 2
 └── docs/
-    ├── rapport-tastigo.pdf
-    ├── services.md
-    ├── agregats.md
-    ├── evenements.md
-    ├── projection.md
-    ├── tastigo-aggregates-events.png
-    └── tastigo-aggregates-events.svg
+    ├── rapport-tastigo.pdf  mini rapport (source : rapport-tastigo.qmd, quarto render --to typst)
+    ├── architecture.dot/.svg/.png
+    ├── services.md, aggregats.md, evenements.md, projection.md, bases-nosql.md
+    └── compte_rendu_mongodb_tastigo.md   compte rendu du TP MongoDB
 ```
 
-## Exécution complète
+## Exigences du projet
 
-Prérequis : Docker Desktop, `jq` et Python 3.
-
-```bash
-./scripts/demo.sh
-```
-
-Ce scénario :
-
-1. démarre MongoDB et Redis ;
-2. remplit les bases ;
-3. consomme `RestaurantPublie` et `MenuMisAJour` depuis l'outbox MongoDB ;
-4. crée et met à jour le catalogue répliqué dans Commande ;
-5. propage `CommandeValidee`, `LivraisonCreee` et `StatutLivraisonModifie` ;
-6. construit la projection `SuiviCommande` ;
-7. affiche les réplicas et la projection obtenus.
-
-Pour exécuter uniquement les requêtes MongoDB :
-
-```bash
-./mongodb/run-queries.sh
-```
-
-Pour contrôler automatiquement les contrats et les données :
-
-```bash
-./scripts/validate.sh
-```
-
-Résultat attendu : `VALIDATION_OK services=4 commandes=8 evenements=7 bases=2`.
-
-## État des étapes demandées
-
-- [x] Étape 1 — idée, équipe, dépôt et description
-- [x] Étape 2 — services et responsabilités
-- [x] Étape 3 — agrégats définis en JSON
-- [x] Étape 4 — services découplés, événements de création et de mise à jour des réplicas
-- [x] Étape 5 — projection vers le nouveau service Suivi
-- [x] Deux technologies NoSQL remplies et interrogeables : MongoDB et Redis
-- [x] Démonstration exécutable de l'échange d'événements et de la projection
+- [x] Au moins deux services : Restaurant, Commande, Livraison, Suivi
+- [x] Au moins deux bases NoSQL : MongoDB et Redis (plus Redis Streams pour le bus)
+- [x] Chaque service a son propre agrégat et sa propre base
+- [x] Un service possède un réplica des données d'un autre : catalogue dans Commande, commande dans Livraison, état de livraison dans Commande, projection dans Suivi
+- [x] Réplicas créés et mis à jour par échange d'événements
+- [x] Niveau 1 : bases remplies et interrogeables sans service (`niveau1/run.sh`)
+- [x] Niveau 2 : services programmés qui utilisent les bases (`scripts/demo.sh`)
 - [x] Mini rapport PDF
-- [x] Invitation GitHub envoyée à `charroux` avec accès en écriture (acceptation en attente)

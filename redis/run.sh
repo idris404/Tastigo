@@ -1,12 +1,12 @@
 #!/usr/bin/env sh
+# Exécute les requêtes de lecture sur les bases Redis des services puis sur le bus.
 set -eu
+cd "$(dirname "$0")/.."
+export MSYS_NO_PATHCONV=1  # Git Bash sous Windows : ne pas convertir /workspace
 
-SCRIPT_NAME="${1:-02_evenements.redis}"
-SCRIPT_PATH="redis/$SCRIPT_NAME"
+filtrer() {
+  grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$1"
+}
 
-if [ ! -f "$SCRIPT_PATH" ]; then
-  echo "Script introuvable : $SCRIPT_PATH" >&2
-  exit 1
-fi
-
-grep -v '^[[:space:]]*#' "$SCRIPT_PATH" | docker compose exec -T redis redis-cli
+filtrer redis/requetes.redis | docker compose exec -T redis redis-cli
+filtrer redis/bus.redis | docker compose exec -T bus redis-cli

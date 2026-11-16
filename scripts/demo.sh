@@ -1,28 +1,14 @@
 #!/usr/bin/env sh
+# Démarre la pile complète (bases, bus, services) puis exécute le scénario vérifié.
+# Option --reset : repart de bases vides (supprime les volumes Docker du projet).
 set -eu
+cd "$(dirname "$0")/.."
 
-docker compose up -d mongodb redis
+if [ "${1:-}" = "--reset" ]; then
+  docker compose down -v
+fi
 
-for SERVICE in mongodb redis; do
-  i=0
-  while [ "$(docker inspect --format '{{.State.Health.Status}}' "tastigo-$SERVICE" 2>/dev/null || true)" != "healthy" ]; do
-    i=$((i + 1))
-    [ "$i" -lt 30 ] || { echo "$SERVICE ne devient pas sain" >&2; exit 1; }
-    sleep 1
-  done
-done
+docker compose up -d --build --wait
 
-# Réinitialisation déterministe du scénario de démonstration.
-docker compose exec -T mongodb mongosh --quiet /workspace/init/01_restaurants.js
-docker compose exec -T redis redis-cli -n 2 FLUSHDB >/dev/null
-docker compose exec -T redis redis-cli -n 3 FLUSHDB >/dev/null
-docker compose exec -T redis redis-cli -n 4 FLUSHDB >/dev/null
-
-./scripts/process-mongodb-outbox.sh
-./redis/run.sh 02_evenements.redis
-
-echo "===== VERIFICATION DES REPLICAS ====="
-docker compose exec -T redis redis-cli -n 2 HGETALL catalogue:restaurant:rest_42
-docker compose exec -T redis redis-cli -n 2 HGETALL catalogue:restaurant:rest_42:plat:plat_7
-docker compose exec -T redis redis-cli -n 3 HGETALL replica:commande:cmd_1001
-docker compose exec -T redis redis-cli -n 4 HGETALL suivi:cmd_1001
+if command -v python3 >/dev/null 2>&1; then PY=python3; else PY=python; fi
+"$PY" scripts/demo.py

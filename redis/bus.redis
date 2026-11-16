@@ -1,0 +1,13 @@
+# Requetes de lecture sur le bus d'evenements (instance tastigo-bus, Redis Streams).
+# Un flux par service recepteur, lu par un groupe de consommateurs du meme nom.
+
+ECHO "===== Boites de reception (nombre d'evenements)"
+XLEN evenements:vers:commande
+XLEN evenements:vers:livraison
+XLEN evenements:vers:suivi
+ECHO "===== Groupes de consommateurs (pending = recus mais non acquittes)"
+XINFO GROUPS evenements:vers:commande
+XINFO GROUPS evenements:vers:livraison
+XINFO GROUPS evenements:vers:suivi
+ECHO "===== Premier evenement recu par Livraison"
+XRANGE evenements:vers:livraison - + COUNT 1

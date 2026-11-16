@@ -1,0 +1,125 @@
+# NIVEAU 1 - Échanges Commande -> Livraison -> Suivi dans Redis, sans service programmé.
+# Bases : 12 Commande, 13 Livraison, 14 Suivi, 15 bus (Redis Streams).
+# Chaque étape suit le même schéma que les services du niveau 2 :
+#   - l'émetteur modifie son agrégat ET écrit l'événement dans son outbox (même MULTI) ;
+#   - l'événement est publié sur la boîte de réception du récepteur (DB 15) ;
+#   - le récepteur applique l'événement à son réplica ET mémorise l'eventId (même MULTI).
+# Les eventId, versions et dates sont ceux du fichier Events.json.
+
+# ===== 1. Commande : ValiderCommande cmd_1001 (version 3)
+SELECT 12
+MULTI
+HSET commande:cmd_1001 commandeId cmd_1001 restaurantId rest_42 statut VALIDEE totalMontant 2580 totalDevise EUR version 3 creeLe 2026-11-16T14:58:57.912Z valideeLe 2026-11-16T14:58:57.949Z prochaineLigne 2 client.clientId cli_18 client.nom "Camille Martin" client.telephone +33612000000 adresseLivraison.ligne1 "8 avenue Parmentier" adresseLivraison.codePostal 75011 adresseLivraison.ville Paris
+RPUSH commande:cmd_1001:lignes ligne_1
+HSET commande:cmd_1001:ligne:ligne_1 ligneId ligne_1 platId plat_7 nomPlat "Bowl falafel" prixUnitaireMontant 1290 prixUnitaireDevise EUR quantite 2
+ZADD commandes:client:cli_18 1794841137912 cmd_1001
+SADD commandes:statut:VALIDEE cmd_1001
+XADD outbox * eventId evt_90acbd4ca57d4000a68f eventType CommandeValidee recepteur livraison aggregateId cmd_1001 aggregateVersion 3
+XADD outbox * eventId evt_75400a5f9a214587817f eventType CommandeValidee recepteur suivi aggregateId cmd_1001 aggregateVersion 3
+EXEC
+
+# Relais vers le bus
+SELECT 15
+XADD evenements:vers:livraison * eventId evt_90acbd4ca57d4000a68f eventType CommandeValidee emetteur commande aggregateId cmd_1001 aggregateVersion 3
+XADD evenements:vers:suivi * eventId evt_75400a5f9a214587817f eventType CommandeValidee emetteur commande aggregateId cmd_1001 aggregateVersion 3
+
+# ===== 2. Livraison reçoit CommandeValidee : création du réplica et de liv_501
+SELECT 13
+MULTI
+HSET replica:commande:cmd_1001 commandeId cmd_1001 nombreArticles 2 totalMontant 2580 totalDevise EUR collecte.restaurantId rest_42 collecte.nom "Le Bistrot Vert" collecte.telephone +33142000000 collecte.adresse.ligne1 "12 rue des Lilas" collecte.adresse.codePostal 75011 collecte.adresse.ville Paris destination.clientId cli_18 destination.nom "Camille Martin" destination.telephone +33612000000 destination.adresse.ligne1 "8 avenue Parmentier" destination.adresse.codePostal 75011 destination.adresse.ville Paris sourceVersion 3 misAJourLe 2026-11-16T14:58:57.949Z
+HSET livraison:liv_501 livraisonId liv_501 commandeId cmd_1001 statut EN_PREPARATION version 1 creeLe 2026-11-16T14:58:57.955Z
+HSET livraisons:par-commande cmd_1001 liv_501
+SADD livraisons:statut:EN_PREPARATION liv_501
+RPUSH livraison:liv_501:historique EN_PREPARATION|2026-11-16T14:58:57.955Z
+SADD evenements:traites evt_90acbd4ca57d4000a68f
+XADD outbox * eventId evt_1aac9e53326f4f098082 eventType LivraisonCreee recepteur suivi aggregateId liv_501 aggregateVersion 1
+XADD outbox * eventId evt_000a7e5018be45339460 eventType LivraisonCreee recepteur commande aggregateId liv_501 aggregateVersion 1
+EXEC
+
+SELECT 15
+XADD evenements:vers:suivi * eventId evt_1aac9e53326f4f098082 eventType LivraisonCreee emetteur livraison aggregateId liv_501 aggregateVersion 1
+XADD evenements:vers:commande * eventId evt_000a7e5018be45339460 eventType LivraisonCreee emetteur livraison aggregateId liv_501 aggregateVersion 1
+
+# ===== 3. Suivi reçoit CommandeValidee puis LivraisonCreee : projection transformée
+SELECT 14
+MULTI
+HSET suivi:cmd_1001 commandeId cmd_1001 clientId cli_18 nomRestaurant "Le Bistrot Vert" nombreArticles 2 totalMontant 2580 totalDevise EUR statutTechnique COMMANDE_VALIDEE statutAffiche "Commande validée, en attente de prise en charge" derniereMiseAJour 2026-11-16T14:58:57.949Z
+ZADD suivi:cmd_1001:chronologie 1794841137949 COMMANDE_VALIDEE|2026-11-16T14:58:57.949Z
+ZADD suivis:client:cli_18 1794841137949 cmd_1001
+SADD evenements:traites evt_75400a5f9a214587817f
+EXEC
+MULTI
+HSET suivi:cmd_1001 livraisonId liv_501 statutTechnique EN_PREPARATION statutAffiche "Votre commande est en préparation" versionLivraison 1 derniereMiseAJour 2026-11-16T14:58:57.955Z
+ZADD suivi:cmd_1001:chronologie 1794841137955 EN_PREPARATION|2026-11-16T14:58:57.955Z
+SADD evenements:traites evt_1aac9e53326f4f098082
+EXEC
+
+# ===== 4. Commande reçoit LivraisonCreee : création du réplica de l'état de livraison
+SELECT 12
+MULTI
+HSET replica:livraison:cmd_1001 livraisonId liv_501 statut EN_PREPARATION sourceVersion 1 misAJourLe 2026-11-16T14:58:57.955Z
+SADD evenements:traites evt_000a7e5018be45339460
+EXEC
+
+# ===== 5. Commande : ModifierAdresseLivraison (version 4) -> AdresseLivraisonModifiee
+MULTI
+HSET commande:cmd_1001 adresseLivraison.ligne1 "10 avenue Parmentier" version 4
+XADD outbox * eventId evt_572f2596eafd46cc9b41 eventType AdresseLivraisonModifiee recepteur livraison aggregateId cmd_1001 aggregateVersion 4
+EXEC
+SELECT 15
+XADD evenements:vers:livraison * eventId evt_572f2596eafd46cc9b41 eventType AdresseLivraisonModifiee emetteur commande aggregateId cmd_1001 aggregateVersion 4
+SELECT 13
+MULTI
+HSET replica:commande:cmd_1001 destination.adresse.ligne1 "10 avenue Parmentier" sourceVersion 4 misAJourLe 2026-11-16T14:58:57.983Z
+SADD evenements:traites evt_572f2596eafd46cc9b41
+EXEC
+
+# ===== 6. Livraison : AffecterLivreur (version 2) puis EN_ROUTE (version 3)
+MULTI
+HSET livraison:liv_501 livreur.livreurId livreur_12 livreur.nom Samir version 2
+EXEC
+MULTI
+HSET livraison:liv_501 statut EN_ROUTE version 3 departLe 2026-11-16T14:58:58.268Z
+SMOVE livraisons:statut:EN_PREPARATION livraisons:statut:EN_ROUTE liv_501
+RPUSH livraison:liv_501:historique EN_ROUTE|2026-11-16T14:58:58.268Z
+XADD outbox * eventId evt_afed00dc3560450bb729 eventType StatutLivraisonModifie recepteur suivi aggregateId liv_501 aggregateVersion 3
+XADD outbox * eventId evt_0ec6f2bc213b4f8eb742 eventType StatutLivraisonModifie recepteur commande aggregateId liv_501 aggregateVersion 3
+EXEC
+SELECT 15
+XADD evenements:vers:suivi * eventId evt_afed00dc3560450bb729 eventType StatutLivraisonModifie emetteur livraison aggregateId liv_501 aggregateVersion 3
+XADD evenements:vers:commande * eventId evt_0ec6f2bc213b4f8eb742 eventType StatutLivraisonModifie emetteur livraison aggregateId liv_501 aggregateVersion 3
+SELECT 14
+MULTI
+HSET suivi:cmd_1001 statutTechnique EN_ROUTE statutAffiche "Votre commande est en route" versionLivraison 3 derniereMiseAJour 2026-11-16T14:58:58.268Z
+ZADD suivi:cmd_1001:chronologie 1794841138268 EN_ROUTE|2026-11-16T14:58:58.268Z
+SADD evenements:traites evt_afed00dc3560450bb729
+EXEC
+SELECT 12
+MULTI
+HSET replica:livraison:cmd_1001 statut EN_ROUTE sourceVersion 3 misAJourLe 2026-11-16T14:58:58.268Z
+SADD evenements:traites evt_0ec6f2bc213b4f8eb742
+EXEC
+
+# ===== 7. Livraison : LIVREE (version 4)
+SELECT 13
+MULTI
+HSET livraison:liv_501 statut LIVREE version 4 livreeLe 2026-11-16T14:58:58.297Z
+SMOVE livraisons:statut:EN_ROUTE livraisons:statut:LIVREE liv_501
+RPUSH livraison:liv_501:historique LIVREE|2026-11-16T14:58:58.297Z
+XADD outbox * eventId evt_554a97ac88b44a34b4e5 eventType StatutLivraisonModifie recepteur suivi aggregateId liv_501 aggregateVersion 4
+XADD outbox * eventId evt_911d50e4fb7a469aaa84 eventType StatutLivraisonModifie recepteur commande aggregateId liv_501 aggregateVersion 4
+EXEC
+SELECT 15
+XADD evenements:vers:suivi * eventId evt_554a97ac88b44a34b4e5 eventType StatutLivraisonModifie emetteur livraison aggregateId liv_501 aggregateVersion 4
+XADD evenements:vers:commande * eventId evt_911d50e4fb7a469aaa84 eventType StatutLivraisonModifie emetteur livraison aggregateId liv_501 aggregateVersion 4
+SELECT 14
+MULTI
+HSET suivi:cmd_1001 statutTechnique LIVREE statutAffiche "Commande livrée" versionLivraison 4 derniereMiseAJour 2026-11-16T14:58:58.297Z
+ZADD suivi:cmd_1001:chronologie 1794841138297 LIVREE|2026-11-16T14:58:58.297Z
+SADD evenements:traites evt_554a97ac88b44a34b4e5
+EXEC
+SELECT 12
+MULTI
+HSET replica:livraison:cmd_1001 statut LIVREE sourceVersion 4 misAJourLe 2026-11-16T14:58:58.297Z
+SADD evenements:traites evt_911d50e4fb7a469aaa84
+EXEC

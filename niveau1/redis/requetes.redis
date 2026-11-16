@@ -1,0 +1,41 @@
+# NIVEAU 1 - Requetes de lecture sur les bases Redis remplies sans service.
+# Bases : 12 Commande, 13 Livraison, 14 Suivi, 15 bus.
+
+SELECT 12
+ECHO "===== COMMANDE (DB 12) : catalogue replique depuis l'outbox MongoDB"
+SMEMBERS catalogue:restaurants
+HGETALL catalogue:restaurant:rest_42
+HGETALL catalogue:plat:rest_42:plat_7
+HGET catalogue:plat:rest_51:plat_21 disponible
+HGET catalogue:restaurant:rest_63 statut
+ECHO "===== COMMANDE (DB 12) : agregat cmd_1001 et index"
+HGETALL commande:cmd_1001
+LRANGE commande:cmd_1001:lignes 0 -1
+HGETALL commande:cmd_1001:ligne:ligne_1
+ZRANGE commandes:client:cli_18 0 -1 WITHSCORES
+ECHO "===== COMMANDE (DB 12) : replica de l'etat de livraison"
+HGETALL replica:livraison:cmd_1001
+ECHO "===== COMMANDE (DB 12) : outbox et evenements traites"
+XRANGE outbox - +
+SMEMBERS evenements:traites
+
+SELECT 13
+ECHO "===== LIVRAISON (DB 13) : replica de la commande et agregat liv_501"
+HGETALL replica:commande:cmd_1001
+HGETALL livraison:liv_501
+LRANGE livraison:liv_501:historique 0 -1
+SMEMBERS livraisons:statut:LIVREE
+
+SELECT 14
+ECHO "===== SUIVI (DB 14) : projection SuiviCommande"
+HGETALL suivi:cmd_1001
+ZRANGE suivi:cmd_1001:chronologie 0 -1
+ECHO "===== SUIVI (DB 14) : un evenement redelivre serait ignore (deja traite = 1)"
+SISMEMBER evenements:traites evt_554a97ac88b44a34b4e5
+
+SELECT 15
+ECHO "===== BUS (DB 15) : boites de reception"
+XLEN evenements:vers:commande
+XLEN evenements:vers:livraison
+XLEN evenements:vers:suivi
+XRANGE evenements:vers:suivi - +
